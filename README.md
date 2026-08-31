@@ -243,8 +243,6 @@ The following models utilize the same ASUS ITE USB HID microcontroller protocol 
 | **ROG Zephyrus** | GX501, GM501, GA503, G531, G533, G733 | Compatible (Aura Core Protocol) |
 | **TUF Gaming** | FX504, FX505, FX705 (RGB models) | Compatible (ITE USB HID 1-Zone / 4-Zone) |
 
-> [!NOTE]
-> Have you tested this on a different ASUS laptop model? Feel free to open an issue or submit a pull request with your controller PID and test results!
 
 ---
 
@@ -441,9 +439,11 @@ swift -framework IOKit -framework Foundation ./Tests/test_backend.swift
 
 ## Disclaimer
 
-- **Non-Affiliation:** This project is an independent open-source community tool and is **not affiliated with, maintained, authorized, endorsed, or sponsored by ASUSTeK Computer Inc. (ASUS) or Apple Inc.**
-- **Trademarks:** All product names, logos, brands, and registered trademarks (including *ASUS*, *ROG*, *Republic of Gamers*, *Aura*, *Armoury Crate*, *Apple*, *macOS*, and *MacBook*) are property of their respective owners.
-- **Hardware & Software Use:** This software interacts directly with internal USB HID microcontroller hardware and system statistics. While thoroughly tested and built with micro-delay safety queues, this software is provided **"AS IS" WITHOUT WARRANTY OF ANY KIND**, express or implied. The authors and contributors assume no liability for any issues, hardware behaviors, or data loss arising from its use.
+- **Educational & Research Purposes Only:** This software and project is developed strictly for **educational, academic, and non-commercial hardware interoperability research purposes**.
+- **Copyright & Trademark Non-Infringement:** This project does not intend to infringe upon, claim ownership of, or challenge any copyrights, intellectual property, patents, or trademarks owned by **ASUSTeK Computer Inc. (ASUS)**, **Apple Inc.**, or any of their respective subsidiaries or affiliates.
+- **Non-Affiliation:** This project is an independent open-source community research tool and is **not affiliated with, maintained, authorized, endorsed, or sponsored by ASUSTeK Computer Inc. (ASUS) or Apple Inc.**
+- **Trademarks:** All product names, logos, brands, emblems, and registered trademarks (including *ASUS*, *ROG*, *Republic of Gamers*, *Aura*, *Armoury Crate*, *Apple*, *macOS*, and *MacBook*) are the exclusive property of their respective owners. Any use of these names or marks within this repository is purely for identification, descriptive, and nominative interoperability purposes.
+- **"AS IS" Hardware & Software Use:** This software interacts directly with internal USB HID microcontroller hardware and system statistics. While thoroughly tested with micro-delay safety FIFO queues, this software is provided **"AS IS" WITHOUT WARRANTY OF ANY KIND**, express or implied. The authors and contributors assume no liability for any issues, hardware behaviors, or data loss arising from its use.
 
 ---
 
