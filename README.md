@@ -10,13 +10,18 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-v1.0.0-red?style=for-the-badge" alt="Version 1.0.0"/>
+  <img src="https://img.shields.io/badge/Version-v1.0.0--beta-red?style=for-the-badge" alt="Version 1.0.0-beta"/>
+  <img src="https://img.shields.io/badge/Status-In%20Active%20Development-yellow?style=for-the-badge" alt="Status"/>
   <img src="https://img.shields.io/badge/Swift-5.9%2B%20Pure%20Native-orange?style=for-the-badge&logo=swift" alt="Swift 5.9+"/>
   <img src="https://img.shields.io/badge/Platform-macOS%2011.0%2B-blue?style=for-the-badge&logo=apple" alt="macOS 11.0+"/>
   <img src="https://img.shields.io/badge/Driver-Native%20IOKit%20HID-purple?style=for-the-badge" alt="IOKit HID"/>
   <img src="https://img.shields.io/badge/Design-macOS%20Liquid%20Glass-007AFF?style=for-the-badge" alt="Liquid Glass Design"/>
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License"/>
 </p>
+
+> [!IMPORTANT]
+> **Active Development & Beta Notice:**
+> This software is currently in **active development and is not yet production-ready**. You are warmly invited to try it out, experiment with its features, and help test. If you encounter any issues, bugs, or unexpected controller behavior, please [open an issue on GitHub](https://github.com/sritulasiram/rog-gaming-center-hackintosh/issues) with your hardware details and logs!
 
 ---
 
