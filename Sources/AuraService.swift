@@ -2,6 +2,33 @@ import Foundation
 import Cocoa
 import IOKit.ps
 
+public enum ROGKeyAction: String, CaseIterable, Identifiable, Codable {
+    case toggleMainWindow = "toggle_main_window"
+    case togglePopover = "toggle_popover"
+    case cyclePresets = "cycle_presets"
+    case toggleBacklightPower = "toggle_backlight_power"
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .toggleMainWindow: return "Toggle Main Window (Show / Hide)"
+        case .togglePopover: return "Toggle Menu Bar HUD Popover"
+        case .cyclePresets: return "Cycle Aura RGB Presets"
+        case .toggleBacklightPower: return "Toggle Backlight (On / Off)"
+        }
+    }
+
+    public var icon: String {
+        switch self {
+        case .toggleMainWindow: return "macwindow"
+        case .togglePopover: return "menubar.arrow.down.rectangle"
+        case .cyclePresets: return "sparkles"
+        case .toggleBacklightPower: return "power"
+        }
+    }
+}
+
 public final class AuraService: ObservableObject {
     public static let shared = AuraService()
 
@@ -25,6 +52,9 @@ public final class AuraService: ObservableObject {
     @Published public var isBatterySaverEnabled: Bool = true
     @Published public var isLaunchAtLoginEnabled: Bool = false
     @Published public var isCloseToTrayEnabled: Bool = true
+    @Published public var isROGKeyEnabled: Bool = true
+    @Published public var rogKeyAction: ROGKeyAction = .toggleMainWindow
+    @Published public var lastROGKeyPressTime: String? = nil
     @Published public var isConnected: Bool = false
     @Published public var deviceName: String = "ASUS ROG Keyboard"
     @Published public var statusMessage: String = "● Connecting..."
@@ -34,6 +64,8 @@ public final class AuraService: ObservableObject {
     @Published public var lastResyncTime: String = "Never"
     @Published public var isPoweredOn: Bool = true
     @Published public var activeEditingZoneIndex: Int = 0 // 0 = Zone 1 (WASD), 1 = Zone 2, etc.
+
+    public var onROGKeyActionTriggered: ((ROGKeyAction) -> Void)?
 
     private var powerSourceRunLoopSource: CFRunLoopSource?
     private var sleepWakeDebounceTimer: Timer?
@@ -84,6 +116,40 @@ public final class AuraService: ObservableObject {
             case .unknown:
                 break
             }
+        }
+
+        driver.onROGKeyPressed = { [weak self] in
+            guard let self = self, self.isROGKeyEnabled else { return }
+            let now = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
+            DispatchQueue.main.async {
+                self.lastROGKeyPressTime = now
+                self.handleROGKeyTrigger()
+            }
+        }
+    }
+
+    // MARK: - Dedicated Hardware ROG Key Dispatcher
+
+    public func handleROGKeyTrigger() {
+        NSLog("[ROGAuraService] 🕹️ Executing ROG Key Action: \(rogKeyAction.rawValue)")
+        switch rogKeyAction {
+        case .toggleMainWindow, .togglePopover:
+            onROGKeyActionTriggered?(rogKeyAction)
+        case .cyclePresets:
+            cycleToNextPreset()
+        case .toggleBacklightPower:
+            togglePower()
+        }
+    }
+
+    public func cycleToNextPreset() {
+        let all = AuraPreset.builtInPresets + customPresets
+        guard !all.isEmpty else { return }
+        if let idx = all.firstIndex(where: { $0.id == activePresetId }) {
+            let nextIdx = (idx + 1) % all.count
+            applyPreset(all[nextIdx])
+        } else {
+            applyPreset(all[0])
         }
     }
 
@@ -360,6 +426,8 @@ public final class AuraService: ObservableObject {
         defaults.set(isBatterySaverEnabled, forKey: "Aura_BatterySaver")
         defaults.set(isLaunchAtLoginEnabled, forKey: "Aura_LaunchAtLogin")
         defaults.set(isCloseToTrayEnabled, forKey: "Aura_CloseToTray")
+        defaults.set(isROGKeyEnabled, forKey: "Aura_ROGKeyEnabled")
+        defaults.set(rogKeyAction.rawValue, forKey: "Aura_ROGKeyAction")
         defaults.set(isPoweredOn, forKey: "Aura_IsPoweredOn")
 
         // Save Zone Colors
@@ -393,6 +461,12 @@ public final class AuraService: ObservableObject {
         }
         if defaults.object(forKey: "Aura_CloseToTray") != nil {
             isCloseToTrayEnabled = defaults.bool(forKey: "Aura_CloseToTray")
+        }
+        if defaults.object(forKey: "Aura_ROGKeyEnabled") != nil {
+            isROGKeyEnabled = defaults.bool(forKey: "Aura_ROGKeyEnabled")
+        }
+        if let rawAct = defaults.string(forKey: "Aura_ROGKeyAction"), let act = ROGKeyAction(rawValue: rawAct) {
+            rogKeyAction = act
         }
         if defaults.object(forKey: "Aura_IsPoweredOn") != nil {
             isPoweredOn = defaults.bool(forKey: "Aura_IsPoweredOn")
