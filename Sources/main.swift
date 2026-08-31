@@ -32,7 +32,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         popover.animates = true
         popover.contentViewController = NSHostingController(rootView: AuraPopoverView())
 
-        // 5. Present Main Window on Launch
+        // 5. Connect Dedicated Hardware ROG Key Dispatcher
+        service.onROGKeyActionTriggered = { [weak self] action in
+            guard let self = self else { return }
+            switch action {
+            case .toggleMainWindow:
+                self.toggleMainWindow()
+            case .togglePopover:
+                self.togglePopover(self.statusItem.button)
+            default:
+                break
+            }
+        }
+
+        // 6. Present Main Window on Launch
         NSLog("[ROGGamingCenter] Showing main window...")
         showMainWindow()
         NSLog("[ROGGamingCenter] Launch setup complete.")
@@ -66,6 +79,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         mainWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    public func toggleMainWindow() {
+        if let window = mainWindow, window.isVisible, NSApp.isActive {
+            if service.isCloseToTrayEnabled {
+                window.orderOut(nil)
+            } else {
+                window.miniaturize(nil)
+            }
+        } else {
+            showMainWindow()
+        }
     }
 
     // MARK: - App Reopen & Close Lifecycle

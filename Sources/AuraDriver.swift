@@ -46,6 +46,8 @@ public final class AuraDriver {
     private var hidManager: IOHIDManager?
 
     public var onDeviceStateChanged: ((Bool, AuraDeviceInfo?) -> Void)?
+    public var onROGKeyPressed: (() -> Void)?
+    private var lastROGKeyPressTimestamp: TimeInterval = 0
 
     /// Fires whenever the app's ability to actually talk to the HID device changes.
     /// This is the signal the UI should use to tell "device unplugged" apart from
@@ -79,9 +81,36 @@ public final class AuraDriver {
             driver.notifyDeviceChange()
         }
 
+        let valueCallback: IOHIDValueCallback = { context, result, sender, value in
+            guard let context = context else { return }
+            let driver = Unmanaged<AuraDriver>.fromOpaque(context).takeUnretainedValue()
+            let elem = IOHIDValueGetElement(value)
+            let page = IOHIDElementGetUsagePage(elem)
+            let usage = IOHIDElementGetUsage(elem)
+            let intVal = IOHIDValueGetIntegerValue(value)
+
+            // ASUS ROG Key (UsagePage: 0xFF31 / 0xFF89 / 0xFF00, Usage: 0x0038, Value: 1 = KeyDown)
+            if (page == 0xFF31 || page == 0xFF89 || page == 0xFF00) && usage == 0x0038 && intVal == 1 {
+                driver.handleROGKeyPress()
+            }
+        }
+
+        let reportCallback: IOHIDReportCallback = { context, result, sender, type, reportID, report, reportLength in
+            guard let context = context, reportLength >= 2 else { return }
+            let driver = Unmanaged<AuraDriver>.fromOpaque(context).takeUnretainedValue()
+            let b0 = report[0]
+            let b1 = report[1]
+            // Report 0x5A with payload byte 0x38 indicates physical ROG key press
+            if (reportID == 0x5A || b0 == 0x5A) && b1 == 0x38 {
+                driver.handleROGKeyPress()
+            }
+        }
+
         let selfPtr = Unmanaged.passUnretained(self).toOpaque()
         IOHIDManagerRegisterDeviceMatchingCallback(manager, matchingCallback, selfPtr)
         IOHIDManagerRegisterDeviceRemovalCallback(manager, removalCallback, selfPtr)
+        IOHIDManagerRegisterInputValueCallback(manager, valueCallback, selfPtr)
+        IOHIDManagerRegisterInputReportCallback(manager, reportCallback, selfPtr)
 
         IOHIDManagerScheduleWithRunLoop(manager, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue)
 
@@ -90,6 +119,16 @@ public final class AuraDriver {
         // HID access at all — every subsequent SetReport will silently no-op.
         let openResult = IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone))
         updatePermissionStatus(from: openResult)
+    }
+
+    public func handleROGKeyPress() {
+        let now = Date().timeIntervalSince1970
+        guard now - lastROGKeyPressTimestamp > 0.25 else { return }
+        lastROGKeyPressTimestamp = now
+        NSLog("[ROGAuraDriver] 🕹️ Hardware ROG Key press detected (Usage 0x0038 / Report 0x5A)")
+        DispatchQueue.main.async { [weak self] in
+            self?.onROGKeyPressed?()
+        }
     }
 
     private func updatePermissionStatus(from ioReturn: IOReturn) {

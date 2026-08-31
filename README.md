@@ -34,11 +34,12 @@
   - [1. Live Telemetry Dashboard](#1-live-telemetry-dashboard)
   - [2. 4-Zone Aura RGB Lighting Studio](#2-4-zone-aura-rgb-lighting-studio)
   - [3. Power, Cooling & Acoustic Management](#3-power-cooling--acoustic-management)
-  - [4. Hackintosh Tools & IOKit Packet Stream Inspector](#4-hackintosh-tools--iokit-packet-stream-inspector)
-  - [5. System Preferences & Startup Configuration](#5-system-preferences--startup-configuration)
-  - [6. Liquid Glass Menu Bar Companion Popover](#6-liquid-glass-menu-bar-companion-popover)
-  - [7. Sleep / Wake Auto-Repair Watchdog](#7-sleep--wake-auto-repair-watchdog)
-  - [8. Standalone Native CLI (`rogauracore`)](#8-standalone-native-cli-rogauracore)
+  - [4. Dedicated Hardware ROG Key Launcher (IOKit Native)](#4-dedicated-hardware-rog-key-launcher-iokit-native)
+  - [5. Hackintosh Tools & IOKit Packet Stream Inspector](#5-hackintosh-tools--iokit-packet-stream-inspector)
+  - [6. System Preferences & Startup Configuration](#6-system-preferences--startup-configuration)
+  - [7. Liquid Glass Menu Bar Companion Popover](#7-liquid-glass-menu-bar-companion-popover)
+  - [8. Sleep / Wake Auto-Repair Watchdog](#8-sleep--wake-auto-repair-watchdog)
+  - [9. Standalone Native CLI (`rogauracore`)](#9-standalone-native-cli-rogauracore)
 - [Supported Hardware & Compatibility](#supported-hardware--compatibility)
   - [Primary Verified Testbed](#primary-verified-testbed)
   - [Architecturally Compatible Models](#architecturally-compatible-models-ite-usb-hid-protocol)
@@ -193,8 +194,18 @@ The interface is engineered around Apple Human Interface Guidelines and modern *
 - **GameVisual Display Profiles:**
   - Quick-switch display calibration modes: *Default Standard, Vivid Gaming, Eye Care (Warm), Cinema Rich*.
 
-### 4. Hackintosh Tools & IOKit Packet Stream Inspector
-- **System Readiness Health Bar:** Instant visual diagnostic indicators for IOKit USB HID matching, ITE 8910 controller presence, sleep watchdog daemon status, and CLI binary installation.
+### 4. Dedicated Hardware ROG Key Launcher (IOKit Native)
+- **Direct ITE 8910 Hardware Interception:** Intercepts hardware input report `0x5A` payload `0x38` (`UsagePage: 0xFF31`, `Usage: 0x0038`) emitted by the physical ROG / Armoury Crate keyboard button via Apple's native `IOHIDManager`.
+- **Zero Daemon & Zero ACPI Hacks:** Requires no Karabiner-Elements, no external key daemons, and no custom DSDT/SSDT EC method re-routes.
+- **Configurable One-Touch Actions:**
+  - **Toggle Main Window:** Instant press-to-reveal / press-to-dismiss behavior identical to Windows Armoury Crate.
+  - **Toggle Menu Bar HUD:** Opens/closes the compact Liquid Glass popover.
+  - **Cycle Aura RGB Presets:** Cycles through built-in and custom lighting profiles.
+  - **Toggle Backlight Power:** Instant night-mode backlight shutoff.
+- **Hardware Debouncing:** Enforces 250ms hardware debounce to prevent duplicate triggers on physical key actuation.
+
+### 5. Hackintosh Tools & IOKit Packet Stream Inspector
+- **System Readiness Health Bar:** Instant visual diagnostic indicators for IOKit USB HID matching, ITE 8910 controller presence, ROG key HID listener state, sleep watchdog daemon status, and CLI binary installation.
 - **One-Click Self Test:** Dispatches test transactions and validates hardware response.
 - **Live 17-Byte Feature Report Inspector:**
   - Real-time visualization of the exact 17-byte raw HID report dispatched over the USB bus:
@@ -208,22 +219,23 @@ The interface is engineered around Apple Human Interface Guidelines and modern *
 - **Automation Shortcuts & Terminal Launcher:**
   - Direct execution ("Run Now" button) or external Terminal execution ("Terminal" button) for common scripting routines.
 
-### 5. System Preferences & Startup Configuration
+### 6. System Preferences & Startup Configuration
 - **Open at Login:** Automatically installs a clean launch agent to `~/Library/LaunchAgents/com.asus.roggamingcenter.plist`.
 - **Close to Tray:** Closing the main window keeps the status item, menu bar popover, and sleep watchdog active in the background.
+- **Dedicated ROG Hardware Key Setup:** Enable/disable physical key listener and select default action with live hardware connection indicators.
 - **Startup Defaults:** Configure your preferred default lighting preset and toggle hardware initialization handshakes on boot.
 - **Global Hotkey Reference:** Quick guide for brightness adjustment and backlight toggling.
 
-### 6. Liquid Glass Menu Bar Companion Popover
+### 7. Liquid Glass Menu Bar Companion Popover
 - Discreet status icon in the macOS menu bar.
 - Left-click triggers the rich `290 × 320 pt` Liquid Glass Popover with live RPM, thermals, battery telemetry, brightness slider, profile switcher, and preset chips.
 - Right-click or Control-click reveals a fast native context menu with brightness levels, preset submenus, hardware re-sync, and quit actions.
 
-### 7. Sleep / Wake Auto-Repair Watchdog
+### 8. Sleep / Wake Auto-Repair Watchdog
 - **The Issue:** ASUS ITE 8910 / 8291 USB HID controllers lose volatile register state when resuming from macOS system sleep (entering an unlit or default maroon state).
 - **The Fix:** An automatic background observer monitors `NSWorkspace.didWakeNotification`, `screensDidWakeNotification`, and `sessionDidBecomeActiveNotification`. After a 600ms debounce, it re-transmits the `"ASUS Tech.Inc."` handshake and reapplies the user's active lighting profile with zero manual intervention.
 
-### 8. Standalone Native CLI (`rogauracore`)
+### 9. Standalone Native CLI (`rogauracore`)
 - Bundled pure Swift command-line tool with zero external runtime dependencies.
 - Perfect for shell scripts, Terminal aliases, keyboard shortcut daemons (skhd), Alfred workflows, Raycast script commands, and Elgato Stream Deck integrations.
 

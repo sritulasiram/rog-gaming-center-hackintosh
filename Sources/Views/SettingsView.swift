@@ -18,10 +18,13 @@ public struct SettingsView: View {
                 // 3. Aura Hardware Startup Defaults
                 AuraHardwareDefaultsCard()
 
-                // 4. Global Keyboard Shortcuts
+                // 4. Dedicated ROG Hardware Key Launcher
+                ROGHardwareKeyCard()
+
+                // 5. Global Keyboard Shortcuts
                 GlobalKeyboardShortcutsCard()
 
-                // 5. Maintenance & App Quit
+                // 6. Maintenance & App Quit
                 MaintenanceCard()
             }
             .padding(18)
@@ -228,7 +231,126 @@ struct AuraHardwareDefaultsCard: View {
     }
 }
 
-// MARK: - 4. Global Keyboard Shortcuts Card
+// MARK: - 4. Dedicated ROG Hardware Key Card
+
+struct ROGHardwareKeyCard: View {
+    @ObservedObject var service = AuraService.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("Dedicated ROG Hardware Key Launcher", systemImage: "sparkle")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.red)
+
+                Spacer()
+
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(service.isConnected ? Color.green : Color.orange)
+                        .frame(width: 7, height: 7)
+                    Text(service.isConnected ? "ITE 8910 (0xFF31 / 0x0038) Active" : "Waiting for Controller")
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundColor(service.isConnected ? .green : .secondary)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background((service.isConnected ? Color.green : Color.orange).opacity(0.12))
+                .cornerRadius(6)
+            }
+
+            VStack(spacing: 10) {
+                // Enable/Disable Toggle
+                HStack(spacing: 12) {
+                    SettingsBadgeIcon(icon: "bolt.fill", color: .red)
+
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Enable Physical ROG Key Interception")
+                            .font(.system(size: 12, weight: .medium))
+                        Text("Intercepts hardware input report 0x5A payload 0x38 directly from the internal USB HID bus.")
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                    }
+
+                    Spacer()
+
+                    Toggle("", isOn: Binding(
+                        get: { service.isROGKeyEnabled },
+                        set: {
+                            service.isROGKeyEnabled = $0
+                            service.saveSettings()
+                        }
+                    ))
+                    .toggleStyle(SwitchToggleStyle())
+                }
+
+                if service.isROGKeyEnabled {
+                    Divider().opacity(0.4)
+
+                    // Action Selector
+                    HStack(spacing: 12) {
+                        SettingsBadgeIcon(icon: service.rogKeyAction.icon, color: .purple)
+
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("Key Press Action")
+                                .font(.system(size: 12, weight: .medium))
+                            Text("Action triggered when pressing the physical ROG key on your keyboard.")
+                                .font(.system(size: 10))
+                                .foregroundColor(.secondary)
+                        }
+
+                        Spacer()
+
+                        Picker("", selection: Binding(
+                            get: { service.rogKeyAction },
+                            set: {
+                                service.rogKeyAction = $0
+                                service.saveSettings()
+                            }
+                        )) {
+                            ForEach(ROGKeyAction.allCases) { action in
+                                HStack {
+                                    Image(systemName: action.icon)
+                                    Text(action.displayName)
+                                }.tag(action)
+                            }
+                        }
+                        .frame(width: 270)
+                    }
+
+                    if let lastTime = service.lastROGKeyPressTime {
+                        Divider().opacity(0.4)
+
+                        HStack(spacing: 8) {
+                            Image(systemName: "hand.tap.fill")
+                                .font(.system(size: 11))
+                                .foregroundColor(.red)
+
+                            Text("Last Physical Press Detected at: \(lastTime)")
+                                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                                .foregroundColor(.primary)
+
+                            Spacer()
+
+                            Text("Hardware Handshake Live ⚡️")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundColor(.green)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(14)
+        .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color(NSColor.separatorColor).opacity(0.5), lineWidth: 0.5)
+        )
+    }
+}
+
+// MARK: - 5. Global Keyboard Shortcuts Card
 
 struct GlobalKeyboardShortcutsCard: View {
     var body: some View {

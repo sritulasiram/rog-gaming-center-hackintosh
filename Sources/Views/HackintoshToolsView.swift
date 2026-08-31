@@ -63,6 +63,7 @@ struct DiagnosticsHealthBar: View {
                 HStack(spacing: 10) {
                     HealthBadge(title: "IOKit USB", ok: service.isConnected)
                     HealthBadge(title: "ITE 8910", ok: service.isConnected)
+                    HealthBadge(title: "ROG Key HID", ok: service.isConnected && service.isROGKeyEnabled)
                     HealthBadge(title: "Sleep Daemon", ok: true)
                     HealthBadge(title: "CLI Binary", ok: true)
                 }
