@@ -380,18 +380,12 @@ public enum AuraPacketBuilder {
         let bLevel = (mode == .off) ? 0 : max(0, min(3, brightness))
         packets.append(buildBrightnessPacket(level: bLevel))
 
-        // Scaling factor for software color scaling
-        let scale: Double
-        switch bLevel {
-        case 0: scale = 0.0
-        case 1: scale = 0.33
-        case 2: scale = 0.66
-        default: scale = 1.0
-        }
-
+        // Note: The ITE 8910 controller handles LED PWM pulse-width scaling via the
+        // dedicated hardware brightness register above. We retain full 8-bit RGB color
+        // precision to prevent double-dimming and preserve color saturation.
         func scaled(_ c: RGBColor) -> RGBColor {
             if bLevel == 0 { return .black }
-            return c.scaled(by: scale)
+            return c
         }
 
         // 3. Mode / Color payload packets

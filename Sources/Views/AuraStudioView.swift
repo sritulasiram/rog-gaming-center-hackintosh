@@ -13,217 +13,248 @@ extension Color {
     }
 }
 
+public enum AuraCoreSubTab: String, CaseIterable, Identifiable {
+    case basicEffects = "BASIC EFFECTS"
+    case custom4Zone = "4-ZONE CUSTOM"
+
+    public var id: String { rawValue }
+}
+
 public struct AuraStudioView: View {
     @ObservedObject var service = AuraService.shared
+    @State private var selectedSubTab: AuraCoreSubTab = .basicEffects
     @State private var hexInputText: String = ""
-    @State private var showingSaveModal: Bool = false
-    @State private var newPresetName: String = ""
+    @State private var showAppliedBanner: Bool = false
 
     public init() {}
 
-    var activeZone: AuraZone {
-        AuraZone(rawValue: service.activeEditingZoneIndex + 1) ?? .zone1
-    }
-
-    var currentColor: RGBColor {
+    var activeColor: RGBColor {
         service.zoneColors[service.activeEditingZoneIndex]
     }
 
     public var body: some View {
-        ZStack {
-            ScrollView(.vertical, showsIndicators: true) {
-                VStack(spacing: 14) {
-                    // 1. Top Stage: Interactive Keyboard Chassis Visualizer
-                    KeyboardStudioChassis()
+        VStack(spacing: 12) {
+            // Top Sub-Navigation Bar
+            HStack(spacing: 16) {
+                ForEach(AuraCoreSubTab.allCases) { tab in
+                    Button(action: {
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            selectedSubTab = tab
+                        }
+                    }) {
+                        VStack(spacing: 4) {
+                            Text(tab.rawValue)
+                                .font(.system(size: 11, weight: selectedSubTab == tab ? .bold : .medium, design: .rounded))
+                                .foregroundColor(selectedSubTab == tab ? .red : .secondary)
 
-                    // 2. Middle Controls: Effects & Dynamics + Color Studio
-                    HStack(alignment: .top, spacing: 12) {
-                        EffectsDynamicsPanel()
-                        ColorStudioPanel(hexInputText: $hexInputText)
+                            Rectangle()
+                                .fill(selectedSubTab == tab ? Color.red : Color.clear)
+                                .frame(height: 2)
+                        }
                     }
-
-                    // 3. Bottom Strip: Lighting Scenes & Presets Gallery
-                    PresetsSceneStrip(
-                        showingSaveModal: $showingSaveModal,
-                        newPresetName: $newPresetName
-                    )
+                    .buttonStyle(PlainButtonStyle())
                 }
-                .padding(18)
+
+                Spacer()
+
+                if showAppliedBanner {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.circle.fill")
+                        Text("Applied to Hardware")
+                    }
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(.green)
+                    .transition(.opacity)
+                }
             }
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
 
-            // Save Preset Modal
-            if showingSaveModal {
-                Color.black.opacity(0.4)
-                    .edgesIgnoringSafeArea(.all)
-                    .onTapGesture { showingSaveModal = false }
+            // 2-Column Main Canvas (Homage to Windows AURA Core)
+            HStack(alignment: .top, spacing: 14) {
+                // LEFT: GL503 Physical Keyboard Stage (70% width)
+                AuraKeyboardStage(selectedSubTab: selectedSubTab, hexInputText: $hexInputText)
+                    .frame(maxWidth: .infinity)
 
-                VStack(spacing: 14) {
-                    HStack {
-                        Image(systemName: "plus.circle.fill")
-                            .foregroundColor(.purple)
-                        Text("Save Lighting Scene")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(.primary)
-                        Spacer()
+                // RIGHT: Controls Panel (30% width)
+                AuraControlsSidebar(
+                    selectedSubTab: $selectedSubTab,
+                    onApply: {
+                        triggerApply()
                     }
-
-                    TextField("Scene Name (e.g. Synthwave)", text: $newPresetName)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .font(.system(size: 12))
-
-                    HStack(spacing: 10) {
-                        Button("Cancel") {
-                            showingSaveModal = false
-                            newPresetName = ""
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .foregroundColor(.secondary)
-
-                        Spacer()
-
-                        Button(action: {
-                            service.saveCustomPreset(name: newPresetName)
-                            showingSaveModal = false
-                            newPresetName = ""
-                        }) {
-                            Text("Save Scene")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 5)
-                                .background(Color.blue)
-                                .cornerRadius(6)
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                    }
-                }
-                .padding(16)
-                .frame(width: 300)
-                .background(Color(NSColor.windowBackgroundColor))
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color(NSColor.separatorColor).opacity(0.6), lineWidth: 0.5)
                 )
-                .shadow(color: Color.black.opacity(0.2), radius: 10)
+                .frame(width: 260)
             }
+            .padding(.horizontal, 18)
+            .padding(.bottom, 16)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
-            hexInputText = currentColor.upperHexString
+            hexInputText = activeColor.upperHexString
         }
         .onChange(of: service.activeEditingZoneIndex) {
-            hexInputText = currentColor.upperHexString
+            hexInputText = activeColor.upperHexString
+        }
+    }
+
+    private func triggerApply() {
+        service.reapplyCurrentLighting()
+        withAnimation(.easeInOut(duration: 0.2)) {
+            showAppliedBanner = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                showAppliedBanner = false
+            }
         }
     }
 }
 
-// MARK: - 1. Interactive Vector Keyboard Chassis Visualizer
+// MARK: - Left Stage: GL503 Vector Keyboard Canvas
 
-struct KeyboardStudioChassis: View {
+struct AuraKeyboardStage: View {
     @ObservedObject var service = AuraService.shared
+    let selectedSubTab: AuraCoreSubTab
+    @Binding var hexInputText: String
+
+    private static let zone1KeyRows: [[String]] = [
+        ["ESC", "F1", "F2", "F3"],
+        ["~", "1", "2", "3"],
+        ["TAB", "Q", "W", "E"],
+        ["CAPS", "A", "S", "D"],
+        ["SHIFT", "Z", "X", "C"],
+        ["CTRL", "FN", "OPT", "CMD"]
+    ]
+
+    private static let zone2KeyRows: [[String]] = [
+        ["F4", "F5", "F6", "F7"],
+        ["4", "5", "6", "7"],
+        ["R", "T", "Y", "U"],
+        ["F", "G", "H", "J"],
+        ["V", "B", "N", "M"],
+        ["SPACE (L)", "CMD"]
+    ]
+
+    private static let zone3KeyRows: [[String]] = [
+        ["F8", "F9", "F10", "F11"],
+        ["8", "9", "0", "-"],
+        ["I", "O", "P", "["],
+        ["K", "L", ";", "'"],
+        [",", ".", "/", "SHIFT"],
+        ["SPACE (R)", "ALT", "CTRL"]
+    ]
+
+    private static let zone4KeyRows: [[String]] = [
+        ["F12", "DEL", "PAUSE", "PRT"],
+        ["=", "NUM", "/", "*"],
+        ["]", "7", "8", "9"],
+        ["ENT", "4", "5", "6"],
+        ["▲", "1", "2", "3"],
+        ["◄", "▼", "►", "0"]
+    ]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            // Technical Crop Brackets Header
             HStack {
-                Label("Interactive Keyboard Chassis", systemImage: "keyboard")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.primary)
-
+                Text("┌ ASUS ROG STRIX GL503 KEYBOARD CHASSIS")
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundColor(.secondary)
                 Spacer()
-
-                Text("Click any zone to customize color")
-                    .font(.system(size: 10))
+                Text("4-ZONE RGB MATRIX ┐")
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundColor(.secondary)
             }
 
-            // Realistic 4-Zone Laptop Keyboard Visualizer
+            // Dedicated Top Hotkeys Row
+            HStack(spacing: 8) {
+                HotkeyCap(title: "VOL -", icon: "speaker.minus")
+                HotkeyCap(title: "VOL +", icon: "speaker.plus")
+                HotkeyCap(title: "MIC MUTE", icon: "mic.slash")
+                HotkeyCap(title: "ROG", icon: "flame.fill", isAccent: true)
+                Spacer()
+                Text(selectedSubTab == .custom4Zone ? "Click a zone to configure colors" : "Hardware animation active")
+                    .font(.system(size: 9))
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 6)
+
+            // 4-Zone Keyboard Array
             HStack(spacing: 6) {
-                // Zone 1: Left & WASD
-                ChassisZoneTile(
+                ZoneChassisBlock(
                     zoneIndex: 0,
-                    title: "Zone 1 (WASD)",
-                    keyRows: [
-                        ["ESC", "1", "2", "3"],
-                        ["TAB", "W", "E", "R"],
-                        ["CAPS", "A", "S", "D"],
-                        ["SHIFT", "Z", "X", "C"]
-                    ],
+                    zoneName: "Zone 1 (WASD)",
+                    keyRows: Self.zone1KeyRows,
                     color: service.zoneColors[0],
-                    isSelected: service.activeEditingZoneIndex == 0,
-                    isPowered: service.isPoweredOn
-                )
-                .onTapGesture {
-                    withAnimation(.easeInOut(duration: 0.15)) {
+                    isSelected: (service.activeEditingZoneIndex == 0 && selectedSubTab == .custom4Zone),
+                    isCustomMode: selectedSubTab == .custom4Zone
+                ) {
+                    if selectedSubTab == .custom4Zone {
                         service.activeEditingZoneIndex = 0
                     }
                 }
 
-                // Zone 2: Center Typing Area
-                ChassisZoneTile(
+                ZoneChassisBlock(
                     zoneIndex: 1,
-                    title: "Zone 2 (Mid)",
-                    keyRows: [
-                        ["4", "5", "6", "7"],
-                        ["T", "Y", "U", "I"],
-                        ["F", "G", "H", "J"],
-                        ["V", "B", "N", "M"]
-                    ],
+                    zoneName: "Zone 2 (Center-L)",
+                    keyRows: Self.zone2KeyRows,
                     color: service.zoneColors[1],
-                    isSelected: service.activeEditingZoneIndex == 1,
-                    isPowered: service.isPoweredOn
-                )
-                .onTapGesture {
-                    withAnimation(.easeInOut(duration: 0.15)) {
+                    isSelected: (service.activeEditingZoneIndex == 1 && selectedSubTab == .custom4Zone),
+                    isCustomMode: selectedSubTab == .custom4Zone
+                ) {
+                    if selectedSubTab == .custom4Zone {
                         service.activeEditingZoneIndex = 1
                     }
                 }
 
-                // Zone 3: Right Navigation Area
-                ChassisZoneTile(
+                ZoneChassisBlock(
                     zoneIndex: 2,
-                    title: "Zone 3 (Right)",
-                    keyRows: [
-                        ["8", "9", "0", "DEL"],
-                        ["O", "P", "[", "]"],
-                        ["K", "L", ";", "ENT"],
-                        [",", ".", "/", "SHIFT"]
-                    ],
+                    zoneName: "Zone 3 (Center-R)",
+                    keyRows: Self.zone3KeyRows,
                     color: service.zoneColors[2],
-                    isSelected: service.activeEditingZoneIndex == 2,
-                    isPowered: service.isPoweredOn
-                )
-                .onTapGesture {
-                    withAnimation(.easeInOut(duration: 0.15)) {
+                    isSelected: (service.activeEditingZoneIndex == 2 && selectedSubTab == .custom4Zone),
+                    isCustomMode: selectedSubTab == .custom4Zone
+                ) {
+                    if selectedSubTab == .custom4Zone {
                         service.activeEditingZoneIndex = 2
                     }
                 }
 
-                // Zone 4: Numpad / Arrow Keys / Lightbar
-                ChassisZoneTile(
+                ZoneChassisBlock(
                     zoneIndex: 3,
-                    title: "Zone 4 (Numpad)",
-                    keyRows: [
-                        ["NUM", "/", "*", "-"],
-                        ["7", "8", "9", "+"],
-                        ["4", "5", "6", "▲"],
-                        ["1", "2", "3", "◄▼►"]
-                    ],
+                    zoneName: "Zone 4 (Numpad)",
+                    keyRows: Self.zone4KeyRows,
                     color: service.zoneColors[3],
-                    isSelected: service.activeEditingZoneIndex == 3,
-                    isPowered: service.isPoweredOn
-                )
-                .onTapGesture {
-                    withAnimation(.easeInOut(duration: 0.15)) {
+                    isSelected: (service.activeEditingZoneIndex == 3 && selectedSubTab == .custom4Zone),
+                    isCustomMode: selectedSubTab == .custom4Zone
+                ) {
+                    if selectedSubTab == .custom4Zone {
                         service.activeEditingZoneIndex = 3
                     }
                 }
             }
             .padding(8)
-            .background(Color.black.opacity(0.2))
+            .background(Color.black.opacity(0.35))
             .cornerRadius(10)
+
+            // Technical Bottom Bracket
+            HStack {
+                Text("└ GL503GE REVISION 2.0")
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text("ITE 8910 CONTROLLER ┘")
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundColor(.secondary)
+            }
+
+            // In 4-Zone Custom Mode: Inline Color Swatches & Hex Input
+            if selectedSubTab == .custom4Zone {
+                ZoneColorPickerToolbar(hexInputText: $hexInputText)
+            }
         }
         .padding(14)
-        .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+        .background(Color(NSColor.controlBackgroundColor).opacity(0.45))
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
@@ -232,552 +263,453 @@ struct KeyboardStudioChassis: View {
     }
 }
 
-struct ChassisZoneTile: View {
-    let zoneIndex: Int
+// MARK: - Zone Color Picker Toolbar
+
+struct ZoneColorPickerToolbar: View {
+    @ObservedObject var service = AuraService.shared
+    @Binding var hexInputText: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Editing Zone \(service.activeEditingZoneIndex + 1)")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.primary)
+                Text("Pick quick swatch or custom hex")
+                    .font(.system(size: 9))
+                    .foregroundColor(.secondary)
+            }
+
+            // Quick Palette
+            HStack(spacing: 6) {
+                QuickColorDot(color: .rogRed) { setZoneColor(.rogRed) }
+                QuickColorDot(color: .orange) { setZoneColor(.orange) }
+                QuickColorDot(color: .yellow) { setZoneColor(.yellow) }
+                QuickColorDot(color: .green) { setZoneColor(.green) }
+                QuickColorDot(color: .cyan) { setZoneColor(.cyan) }
+                QuickColorDot(color: .blue) { setZoneColor(.blue) }
+                QuickColorDot(color: .purple) { setZoneColor(.purple) }
+                QuickColorDot(color: .white) { setZoneColor(.white) }
+            }
+
+            Spacer()
+
+            // Hex Input
+            HStack(spacing: 4) {
+                Text("#")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(.secondary)
+                TextField("RRGGBB", text: $hexInputText)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .font(.system(size: 11, design: .monospaced))
+                    .frame(width: 70)
+                    .onSubmit {
+                        if let c = RGBColor(hex: hexInputText) {
+                            setZoneColor(c)
+                        }
+                    }
+            }
+
+            // Native macOS Color Wheel Button
+            Button(action: {
+                NSColorPanel.shared.orderFront(nil)
+            }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "paintpalette.fill")
+                    Text("Wheel")
+                }
+                .font(.system(size: 10, weight: .medium))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color(NSColor.controlColor).opacity(0.8))
+                .cornerRadius(6)
+            }
+            .buttonStyle(PlainButtonStyle())
+        }
+        .padding(10)
+        .background(Color(NSColor.controlBackgroundColor).opacity(0.6))
+        .cornerRadius(8)
+    }
+
+    private func setZoneColor(_ color: RGBColor) {
+        service.setZoneColor(zoneIndex: service.activeEditingZoneIndex, color: color)
+        hexInputText = color.upperHexString
+    }
+}
+
+// MARK: - Dedicated Hotkey Cap
+
+struct HotkeyCap: View {
     let title: String
+    let icon: String
+    var isAccent: Bool = false
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 8, weight: .bold))
+            Text(title)
+                .font(.system(size: 8, weight: .bold, design: .monospaced))
+        }
+        .foregroundColor(isAccent ? .red : .secondary)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .background(Color.black.opacity(0.35))
+        .cornerRadius(4)
+        .overlay(
+            RoundedRectangle(cornerRadius: 4)
+                .stroke(isAccent ? Color.red.opacity(0.6) : Color.white.opacity(0.1), lineWidth: 0.5)
+        )
+    }
+}
+
+// MARK: - Zone Keycap Block
+
+struct ZoneChassisBlock: View {
+    let zoneIndex: Int
+    let zoneName: String
     let keyRows: [[String]]
     let color: RGBColor
     let isSelected: Bool
-    let isPowered: Bool
+    let isCustomMode: Bool
+    let onTap: () -> Void
 
     var displayColor: Color {
-        isPowered ? Color(rgb: color) : Color.gray.opacity(0.3)
+        Color(rgb: color)
     }
 
     var body: some View {
-        VStack(spacing: 6) {
-            // Miniature Keycap Grid Simulation
-            VStack(spacing: 3) {
-                ForEach(0..<keyRows.count, id: \.self) { rowIdx in
-                    HStack(spacing: 3) {
-                        ForEach(0..<keyRows[rowIdx].count, id: \.self) { colIdx in
-                            let label = keyRows[rowIdx][colIdx]
+        VStack(spacing: 4) {
+            // Key Grid
+            VStack(spacing: 2) {
+                ForEach(0..<keyRows.count, id: \.self) { r in
+                    HStack(spacing: 2) {
+                        ForEach(0..<keyRows[r].count, id: \.self) { c in
+                            let label = keyRows[r][c]
                             let isWASD = (zoneIndex == 0 && (label == "W" || label == "A" || label == "S" || label == "D"))
 
                             Text(label)
-                                .font(.system(size: 8, weight: isWASD ? .bold : .regular, design: .monospaced))
-                                .foregroundColor(isWASD ? .white : .primary.opacity(0.8))
-                                .frame(maxWidth: .infinity, minHeight: 14)
+                                .font(.system(size: 7, weight: isWASD ? .bold : .medium, design: .monospaced))
+                                .foregroundColor(isWASD ? .white : .primary.opacity(0.85))
+                                .frame(maxWidth: .infinity, minHeight: 12)
                                 .background(
-                                    RoundedRectangle(cornerRadius: 2)
+                                    RoundedRectangle(cornerRadius: 1.5)
                                         .fill(isWASD ? displayColor.opacity(0.9) : displayColor.opacity(0.35))
                                 )
                         }
                     }
                 }
             }
-            .padding(6)
-            .background(Color(NSColor.controlBackgroundColor).opacity(0.4))
-            .cornerRadius(6)
+            .padding(4)
+            .background(Color(NSColor.controlBackgroundColor).opacity(0.3))
+            .cornerRadius(5)
 
-            // Zone Footer
-            HStack(spacing: 4) {
+            // Zone Footer Tag
+            HStack(spacing: 3) {
                 Circle()
                     .fill(displayColor)
-                    .frame(width: 6, height: 6)
-
-                Text(title)
-                    .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
-                    .foregroundColor(isSelected ? .primary : .secondary)
-
+                    .frame(width: 5, height: 5)
+                Text(zoneName)
+                    .font(.system(size: 9, weight: isSelected ? .bold : .regular))
+                    .foregroundColor(isSelected ? .red : .secondary)
                 Spacer()
-
-                Text("#\(color.upperHexString)")
-                    .font(.system(size: 9, design: .monospaced))
-                    .foregroundColor(.secondary)
             }
         }
-        .padding(8)
+        .padding(6)
         .frame(maxWidth: .infinity)
         .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(isSelected ? Color(NSColor.selectedContentBackgroundColor).opacity(0.15) : Color.clear)
+            RoundedRectangle(cornerRadius: 7)
+                .fill(isSelected ? Color.red.opacity(0.12) : Color.clear)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 1.5)
+            RoundedRectangle(cornerRadius: 7)
+                .stroke(isSelected ? Color.red : Color.clear, lineWidth: 1.5)
         )
-        .shadow(
-            color: isPowered ? displayColor.opacity(isSelected ? 0.3 : 0.08) : Color.clear,
-            radius: isSelected ? 8 : 4
-        )
+        .onTapGesture {
+            onTap()
+        }
     }
 }
 
-// MARK: - 2. Middle Controls: Effects & Dynamics + Color Studio
+// MARK: - Quick Color Dot
 
-struct EffectsDynamicsPanel: View {
+struct QuickColorDot: View {
+    let color: RGBColor
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Circle()
+                .fill(Color(rgb: color))
+                .frame(width: 16, height: 16)
+                .overlay(Circle().stroke(Color.white.opacity(0.3), lineWidth: 0.5))
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+// MARK: - Right Column: Aura Controls Stack
+
+struct AuraControlsSidebar: View {
     @ObservedObject var service = AuraService.shared
+    @Binding var selectedSubTab: AuraCoreSubTab
+    let onApply: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label("Effects & Dynamics", systemImage: "sparkles")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(.primary)
-
-            // Effect Selector (Apple Segmented Grid)
+            // 1. Brightness Slider
             VStack(alignment: .leading, spacing: 6) {
-                Text("Lighting Mode")
-                    .font(.system(size: 11))
+                HStack {
+                    Text("BRIGHTNESS")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text(service.isPoweredOn ? "\(service.currentBrightness * 33)%" : "Off")
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .foregroundColor(.primary)
+                }
+
+                HStack(spacing: 4) {
+                    BrightnessSegmentButton(title: "Off", isSelected: !service.isPoweredOn || service.currentBrightness == 0) {
+                        service.setBrightness(0)
+                        HUDService.shared.showBacklightHUD(level: 0)
+                    }
+                    BrightnessSegmentButton(title: "33%", isSelected: service.isPoweredOn && service.currentBrightness == 1) {
+                        service.setBrightness(1)
+                        HUDService.shared.showBacklightHUD(level: 1)
+                    }
+                    BrightnessSegmentButton(title: "66%", isSelected: service.isPoweredOn && service.currentBrightness == 2) {
+                        service.setBrightness(2)
+                        HUDService.shared.showBacklightHUD(level: 2)
+                    }
+                    BrightnessSegmentButton(title: "100%", isSelected: service.isPoweredOn && service.currentBrightness == 3) {
+                        service.setBrightness(3)
+                        HUDService.shared.showBacklightHUD(level: 3)
+                    }
+                }
+            }
+            .padding(10)
+            .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+            .cornerRadius(8)
+
+            // 2. Lighting Effects List (Matching Windows AURA radio list)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("[ EFFECTS ]")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
                     .foregroundColor(.secondary)
 
-                HStack(spacing: 6) {
-                    EffectPillButton(title: "Static", icon: "lightbulb.fill", isSelected: isStatic()) {
+                VStack(spacing: 3) {
+                    EffectRowRadio(
+                        title: "STATIC",
+                        subtitle: "Constant RGB luminescence",
+                        isSelected: isCurrentModeStatic(),
+                        icon: "lightbulb.fill"
+                    ) {
+                        selectedSubTab = .basicEffects
                         service.applySingleColor(service.zoneColors.first ?? .rogRed)
                     }
 
-                    EffectPillButton(title: "Spectrum", icon: "sparkles", isSelected: isSelected(.colorCycle(.medium))) {
-                        service.applyPreset(AuraPreset.builtInPresets[0])
-                    }
-
-                    EffectPillButton(title: "Rainbow", icon: "rainbow", isSelected: isSelected(.rainbow(.medium))) {
-                        service.applyPreset(AuraPreset.builtInPresets[1])
-                    }
-
-                    EffectPillButton(title: "Breathing", icon: "water.waves", isSelected: isBreathing()) {
+                    EffectRowRadio(
+                        title: "BREATHING",
+                        subtitle: "Smooth rhythmic cycle",
+                        isSelected: isCurrentModeBreathing(),
+                        icon: "water.waves"
+                    ) {
+                        selectedSubTab = .basicEffects
                         service.applyPreset(AuraPreset.builtInPresets[9])
                     }
 
-                    EffectPillButton(title: "Strobe", icon: "bolt.fill", isSelected: isStrobe()) {
+                    EffectRowRadio(
+                        title: "COLOR CYCLE",
+                        subtitle: "Full spectrum shift",
+                        isSelected: isCurrentModeColorCycle(),
+                        icon: "sparkles"
+                    ) {
+                        selectedSubTab = .basicEffects
+                        service.applyPreset(AuraPreset.builtInPresets[0])
+                    }
+
+                    EffectRowRadio(
+                        title: "RAINBOW",
+                        subtitle: "Dynamic rolling gradient",
+                        isSelected: isCurrentModeRainbow(),
+                        icon: "rainbow"
+                    ) {
+                        selectedSubTab = .basicEffects
+                        service.applyPreset(AuraPreset.builtInPresets[1])
+                    }
+
+                    EffectRowRadio(
+                        title: "STROBING",
+                        subtitle: "High-energy RGB pulse",
+                        isSelected: isCurrentModeStrobing(),
+                        icon: "bolt.fill"
+                    ) {
+                        selectedSubTab = .basicEffects
                         service.applyPreset(AuraPreset.builtInPresets[11])
                     }
                 }
             }
+            .padding(10)
+            .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+            .cornerRadius(8)
 
-            Divider().opacity(0.4)
-
-            // Control Center Brightness Slider
+            // 3. Animation Speed (Tempo)
             VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text("Brightness")
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
-
-                    Spacer()
-
-                    Text(service.isPoweredOn ? "\(service.currentBrightness * 33)%" : "Off")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.primary)
-                }
-
-                HStack(spacing: 8) {
-                    Image(systemName: "sun.min.fill")
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
-
-                    Slider(
-                        value: Binding(
-                            get: { Double(service.isPoweredOn ? service.currentBrightness : 0) },
-                            set: { val in service.setBrightness(Int(val.rounded())) }
-                        ),
-                        in: 0...3,
-                        step: 1
-                    )
-                    .accentColor(.blue)
-
-                    Image(systemName: "sun.max.fill")
-                        .font(.system(size: 13))
-                        .foregroundColor(.secondary)
-                }
-            }
-
-            Divider().opacity(0.4)
-
-            // Animation Speed
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Animation Speed")
-                    .font(.system(size: 11))
+                Text("[ TEMPO ]")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
                     .foregroundColor(.secondary)
 
-                Picker("", selection: Binding(
-                    get: { service.currentSpeed },
-                    set: { speed in service.setSpeed(speed) }
-                )) {
-                    ForEach(AuraSpeed.allCases, id: \.self) { sp in
-                        Text(sp.displayName).tag(sp)
+                HStack(spacing: 6) {
+                    TempoPillButton(title: "SLOW", isSelected: service.currentSpeed == .slow) {
+                        service.setSpeed(.slow)
+                    }
+                    TempoPillButton(title: "MEDIUM", isSelected: service.currentSpeed == .medium) {
+                        service.setSpeed(.medium)
+                    }
+                    TempoPillButton(title: "FAST", isSelected: service.currentSpeed == .fast) {
+                        service.setSpeed(.fast)
                     }
                 }
-                .pickerStyle(SegmentedPickerStyle())
             }
+            .padding(10)
+            .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+            .cornerRadius(8)
+
+            Spacer()
+
+            // 4. Prominent Red Apply Button (Exact Windows Homage)
+            Button(action: onApply) {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 12, weight: .bold))
+                    Text("APPLY")
+                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.red)
+                )
+                .shadow(color: Color.red.opacity(0.35), radius: 6, x: 0, y: 2)
+            }
+            .buttonStyle(PlainButtonStyle())
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(NSColor.separatorColor).opacity(0.5), lineWidth: 0.5)
-        )
     }
 
-    private func isStatic() -> Bool {
+    private func isCurrentModeStatic() -> Bool {
         if case .singleStatic = service.currentMode { return true }
         if case .multiStatic = service.currentMode { return true }
         return false
     }
 
-    private func isSelected(_ mode: AuraMode) -> Bool {
-        switch (service.currentMode, mode) {
-        case (.colorCycle, .colorCycle): return true
-        case (.rainbow, .rainbow): return true
-        default: return false
-        }
-    }
-
-    private func isBreathing() -> Bool {
+    private func isCurrentModeBreathing() -> Bool {
         if case .singleBreathing = service.currentMode { return true }
         if case .multiBreathing = service.currentMode { return true }
         return false
     }
 
-    private func isStrobe() -> Bool {
+    private func isCurrentModeColorCycle() -> Bool {
+        if case .colorCycle = service.currentMode { return true }
+        return false
+    }
+
+    private func isCurrentModeRainbow() -> Bool {
+        if case .rainbow = service.currentMode { return true }
+        return false
+    }
+
+    private func isCurrentModeStrobing() -> Bool {
         if case .strobing = service.currentMode { return true }
         return false
     }
 }
 
-struct EffectPillButton: View {
+// MARK: - Control Buttons
+
+struct BrightnessSegmentButton: View {
     let title: String
-    let icon: String
     let isSelected: Bool
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 3) {
-                Image(systemName: icon)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(isSelected ? .white : .primary)
+            Text(title)
+                .font(.system(size: 10, weight: isSelected ? .bold : .regular, design: .monospaced))
+                .foregroundColor(isSelected ? .white : .secondary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 5)
+                .background(
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(isSelected ? Color.blue : Color(NSColor.controlColor).opacity(0.6))
+                )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
 
-                Text(title)
-                    .font(.system(size: 9, weight: isSelected ? .semibold : .regular))
-                    .foregroundColor(isSelected ? .white : .secondary)
+struct EffectRowRadio: View {
+    let title: String
+    let subtitle: String
+    let isSelected: Bool
+    let icon: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(isSelected ? .red : .secondary)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title)
+                        .font(.system(size: 11, weight: isSelected ? .bold : .medium, design: .monospaced))
+                        .foregroundColor(isSelected ? .primary : .secondary)
+                    Text(subtitle)
+                        .font(.system(size: 8.5))
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: icon)
+                    .font(.system(size: 10))
+                    .foregroundColor(isSelected ? .red : .secondary.opacity(0.6))
             }
-            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 8)
             .padding(.vertical, 6)
             .background(
                 RoundedRectangle(cornerRadius: 6)
-                    .fill(isSelected ? Color.blue : Color(NSColor.controlColor).opacity(0.6))
+                    .fill(isSelected ? Color.red.opacity(0.12) : Color.clear)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(isSelected ? Color.red.opacity(0.4) : Color.clear, lineWidth: 0.5)
             )
         }
         .buttonStyle(PlainButtonStyle())
     }
 }
 
-// Color Studio Panel
-struct ColorStudioPanel: View {
-    @ObservedObject var service = AuraService.shared
-    @Binding var hexInputText: String
-    @State private var isAllZonesMode: Bool = true
-
-    var activeZone: AuraZone {
-        AuraZone(rawValue: service.activeEditingZoneIndex + 1) ?? .zone1
-    }
-
-    var currentColor: RGBColor {
-        service.zoneColors[service.activeEditingZoneIndex]
-    }
-
-    let applePalette: [RGBColor] = [
-        RGBColor.rogRed, RGBColor.red, RGBColor.orange, RGBColor.gold,
-        RGBColor.yellow, RGBColor.lime, RGBColor.green, RGBColor.matrix,
-        RGBColor.cyan, RGBColor.iceBlue, RGBColor.blue, RGBColor.purple,
-        RGBColor.magenta, RGBColor.neonPink, RGBColor.white
-    ]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // Header with target zone indicator and Color Picker trigger
-            HStack {
-                Label(isAllZonesMode ? "Color Studio (All Zones / Whole Keyboard)" : "Color Studio (\(activeZone.name))", systemImage: "paintpalette")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.primary)
-
-                Spacer()
-
-                Button(action: openSystemColorPicker) {
-                    HStack(spacing: 3) {
-                        Image(systemName: "circle.hexagongrid.fill")
-                            .font(.system(size: 11))
-                        Text("Color Wheel")
-                            .font(.system(size: 10))
-                    }
-                    .foregroundColor(.blue)
-                }
-                .buttonStyle(PlainButtonStyle())
-                .help("Open macOS System Color Picker")
-            }
-
-            // Scope Selector: All Zones vs Per-Zone
-            HStack(spacing: 4) {
-                Button(action: {
-                    isAllZonesMode = true
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "keyboard")
-                            .font(.system(size: 9))
-                        Text("All Zones")
-                            .font(.system(size: 10, weight: isAllZonesMode ? .semibold : .regular))
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(isAllZonesMode ? Color.blue : Color(NSColor.controlColor).opacity(0.6))
-                    .foregroundColor(isAllZonesMode ? .white : .primary)
-                    .cornerRadius(5)
-                }
-                .buttonStyle(PlainButtonStyle())
-
-                ForEach(0..<4) { idx in
-                    Button(action: {
-                        isAllZonesMode = false
-                        service.activeEditingZoneIndex = idx
-                    }) {
-                        Text(zoneLabel(idx))
-                            .font(.system(size: 10, weight: (!isAllZonesMode && service.activeEditingZoneIndex == idx) ? .semibold : .regular))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 4)
-                            .background((!isAllZonesMode && service.activeEditingZoneIndex == idx) ? Color.blue : Color(NSColor.controlColor).opacity(0.6))
-                            .foregroundColor((!isAllZonesMode && service.activeEditingZoneIndex == idx) ? .white : .primary)
-                            .cornerRadius(5)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                }
-            }
-
-            // Curated Swatch Palette
-            VStack(alignment: .leading, spacing: 5) {
-                Text("Curated Color Palette")
-                    .font(.system(size: 10))
-                    .foregroundColor(.secondary)
-
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 5), spacing: 6) {
-                    ForEach(applePalette, id: \.self) { c in
-                        Button(action: {
-                            hexInputText = c.upperHexString
-                            applySelectedColor(c)
-                        }) {
-                            Circle()
-                                .fill(Color(rgb: c))
-                                .frame(height: 22)
-                                .overlay(
-                                    Circle()
-                                        .stroke(Color.white.opacity(c == currentColor ? 0.9 : 0.2), lineWidth: c == currentColor ? 2 : 0.5)
-                                )
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                    }
-                }
-            }
-
-            Divider().opacity(0.4)
-
-            // Hex input & Quick Actions
-            HStack(spacing: 8) {
-                TextField("HEX", text: $hexInputText, onCommit: applyHex)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .font(.system(size: 11, design: .monospaced))
-                    .frame(width: 85)
-
-                Button("Apply") {
-                    applyHex()
-                }
-                .font(.system(size: 11, weight: .medium))
-                .buttonStyle(PlainButtonStyle())
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Color(NSColor.controlColor).opacity(0.8))
-                .cornerRadius(6)
-
-                Spacer()
-
-                Button(action: {
-                    isAllZonesMode = true
-                    service.applySingleColor(currentColor)
-                }) {
-                    HStack(spacing: 3) {
-                        Image(systemName: "square.fill.on.square.fill")
-                        Text("Apply to All")
-                    }
-                    .font(.system(size: 10, weight: .medium))
-                }
-                .buttonStyle(PlainButtonStyle())
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Color.blue.opacity(0.12))
-                .foregroundColor(.blue)
-                .cornerRadius(6)
-            }
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(NSColor.separatorColor).opacity(0.5), lineWidth: 0.5)
-        )
-    }
-
-    private func zoneLabel(_ idx: Int) -> String {
-        switch idx {
-        case 0: return "WASD"
-        case 1: return "Center-L"
-        case 2: return "Center-R"
-        case 3: return "Numpad"
-        default: return "Z\(idx+1)"
-        }
-    }
-
-    private func applySelectedColor(_ col: RGBColor) {
-        if isAllZonesMode {
-            service.applySingleColor(col)
-        } else {
-            service.setZoneColor(zoneIndex: service.activeEditingZoneIndex, color: col)
-        }
-    }
-
-    private func applyHex() {
-        if let col = RGBColor(hex: hexInputText) {
-            applySelectedColor(col)
-        }
-    }
-
-    private func openSystemColorPicker() {
-        let panel = NSColorPanel.shared
-        let c = currentColor
-        panel.color = NSColor(red: CGFloat(c.red)/255.0, green: CGFloat(c.green)/255.0, blue: CGFloat(c.blue)/255.0, alpha: 1.0)
-        panel.orderFront(nil)
-        ColorPanelDelegate.shared.isAllZones = isAllZonesMode
-        panel.setTarget(ColorPanelDelegate.shared)
-        panel.setAction(#selector(ColorPanelDelegate.colorChanged(_:)))
-    }
-}
-
-class ColorPanelDelegate: NSObject {
-    static let shared = ColorPanelDelegate()
-    var isAllZones: Bool = true
-
-    @objc func colorChanged(_ sender: NSColorPanel) {
-        let col = sender.color.usingColorSpace(.sRGB) ?? sender.color
-        let r = UInt8(max(0, min(255, col.redComponent * 255.0)))
-        let g = UInt8(max(0, min(255, col.greenComponent * 255.0)))
-        let b = UInt8(max(0, min(255, col.blueComponent * 255.0)))
-        let rgb = RGBColor(red: r, green: g, blue: b)
-        if isAllZones {
-            AuraService.shared.applySingleColor(rgb)
-        } else {
-            AuraService.shared.setZoneColor(zoneIndex: AuraService.shared.activeEditingZoneIndex, color: rgb)
-        }
-    }
-}
-
-// MARK: - 3. Bottom Strip: Lighting Scenes & Presets Gallery
-
-struct PresetsSceneStrip: View {
-    @ObservedObject var service = AuraService.shared
-    @Binding var showingSaveModal: Bool
-    @Binding var newPresetName: String
-
-    var allPresets: [AuraPreset] {
-        AuraPreset.builtInPresets + service.customPresets
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Label("Lighting Scenes & Presets", systemImage: "slider.horizontal.2.square")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.primary)
-
-                Spacer()
-
-                Button(action: {
-                    newPresetName = "Custom \(service.customPresets.count + 1)"
-                    showingSaveModal = true
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "plus.circle.fill")
-                        Text("Save Current Scene")
-                    }
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.blue)
-                }
-                .buttonStyle(PlainButtonStyle())
-            }
-
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                ForEach(allPresets) { preset in
-                    ScenePillCard(preset: preset, isSelected: (service.activePresetId == preset.id))
-                }
-            }
-        }
-        .padding(14)
-        .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(NSColor.separatorColor).opacity(0.5), lineWidth: 0.5)
-        )
-    }
-}
-
-struct ScenePillCard: View {
-    let preset: AuraPreset
+struct TempoPillButton: View {
+    let title: String
     let isSelected: Bool
-    @ObservedObject var service = AuraService.shared
+    let action: () -> Void
 
     var body: some View {
-        Button(action: {
-            service.applyPreset(preset)
-        }) {
-            HStack(spacing: 8) {
-                ZStack {
-                    Circle()
-                        .fill(isSelected ? Color.blue : Color(NSColor.controlColor).opacity(0.6))
-                        .frame(width: 24, height: 24)
-
-                    Image(systemName: preset.icon)
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(isSelected ? .white : .primary)
-                }
-
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(preset.name)
-                        .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
-                        .foregroundColor(isSelected ? .primary : .secondary)
-                        .lineLimit(1)
-
-                    HStack(spacing: 2) {
-                        ForEach(0..<min(preset.previewColors.count, 4), id: \.self) { cIdx in
-                            Circle()
-                                .fill(Color(rgb: preset.previewColors[cIdx]))
-                                .frame(width: 4, height: 4)
-                        }
-                    }
-                }
-
-                Spacer()
-
-                if preset.isCustom {
-                    Button(action: {
-                        service.deleteCustomPreset(id: preset.id)
-                    }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 9))
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                }
-            }
-            .padding(8)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected ? Color(NSColor.selectedContentBackgroundColor).opacity(0.15) : Color(NSColor.controlColor).opacity(0.4))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(isSelected ? Color.blue.opacity(0.8) : Color(NSColor.separatorColor).opacity(0.4), lineWidth: 0.5)
-            )
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 10, weight: isSelected ? .bold : .regular, design: .monospaced))
+                .foregroundColor(isSelected ? .white : .secondary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 5)
+                .background(
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(isSelected ? Color.red : Color(NSColor.controlColor).opacity(0.6))
+                )
         }
         .buttonStyle(PlainButtonStyle())
     }

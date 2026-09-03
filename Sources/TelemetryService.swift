@@ -3,48 +3,6 @@ import Darwin
 import IOKit
 import IOKit.ps
 
-// MARK: - Performance & Power Profiles
-
-public enum ROGPerformanceProfile: String, CaseIterable, Codable, Identifiable {
-    case silent = "silent"
-    case balanced = "balanced"
-    case turbo = "turbo"
-
-    public var id: String { rawValue }
-
-    public var title: String {
-        switch self {
-        case .silent: return "Silent (Eco)"
-        case .balanced: return "Balanced"
-        case .turbo: return "Turbo ROG"
-        }
-    }
-
-    public var subtitle: String {
-        switch self {
-        case .silent: return "Low power, dimmed RGB, battery optimization"
-        case .balanced: return "Standard clocks, responsive Aura lighting"
-        case .turbo: return "Max performance, full Aura glow, high clocks"
-        }
-    }
-
-    public var icon: String {
-        switch self {
-        case .silent: return "leaf.fill"
-        case .balanced: return "scale.3d"
-        case .turbo: return "flame.fill"
-        }
-    }
-
-    public var defaultBrightness: Int {
-        switch self {
-        case .silent: return 1
-        case .balanced: return 2
-        case .turbo: return 3
-        }
-    }
-}
-
 // MARK: - GameVisual / Display Calibration Profiles
 
 public enum ROGDisplayProfile: String, CaseIterable, Codable, Identifiable {
@@ -90,6 +48,7 @@ public struct MemoryUsageData {
     public var compressedGB: Double = 0.0
     public var freeGB: Double = 0.0
     public var usedPercent: Double = 0.0
+    public var usedGB: Double { activeGB + wiredGB + compressedGB }
 }
 
 public struct BatteryTelemetryData {
@@ -116,42 +75,19 @@ public struct BatteryTelemetryData {
 
 // MARK: - Fan & Thermal Telemetry Models
 
-public enum ROGFanMode: String, CaseIterable, Codable, Identifiable {
-    case auto = "auto"
-    case overboost = "overboost"
-    case quiet = "quiet"
-    case manual = "manual"
-
-    public var id: String { rawValue }
-
-    public var title: String {
-        switch self {
-        case .auto: return "Auto (Adaptive)"
-        case .overboost: return "Overboost (Max Cooling)"
-        case .quiet: return "Quiet (Stealth)"
-        case .manual: return "Manual Fixed"
-        }
-    }
-
-    public var icon: String {
-        switch self {
-        case .auto: return "fanblades"
-        case .overboost: return "wind"
-        case .quiet: return "leaf.fill"
-        case .manual: return "slider.horizontal.3"
-        }
-    }
-}
-
 public struct FanTelemetryData {
-    public var cpuFanRPM: Int = 2400
-    public var gpuFanRPM: Int = 2200
-    public var maxFanRPM: Int = 5800
+    public var fanRPM: Int = 2200
+    public var maxFanRPM: Int = 3315
     public var cpuTempCelsius: Int = 45
-    public var gpuTempCelsius: Int = 43
-    public var fanMode: ROGFanMode = .auto
-    public var manualSpeedPercent: Double = 50.0
-    public var acousticDecibels: Int = 28
+    public var thermalHeadroomPercent: Int = 55
+    public var coolingPhaseTitle: String = "Quiet Airflow"
+    public var isRealHardwareThermals: Bool = false
+    public var isRealFanRPM: Bool = false
+
+    // Compatibility aliases
+    public var cpuFanRPM: Int { fanRPM }
+    public var gpuFanRPM: Int { fanRPM }
+    public var gpuTempCelsius: Int { max(35, cpuTempCelsius - 4) }
 }
 
 public struct SystemSpecsData {
@@ -173,15 +109,16 @@ public final class TelemetryService: ObservableObject {
     @Published public var battery = BatteryTelemetryData()
     @Published public var fan = FanTelemetryData()
     @Published public var specs = SystemSpecsData()
-    @Published public var activeProfile: ROGPerformanceProfile = .balanced
     @Published public var activeDisplayProfile: ROGDisplayProfile = .standard
     @Published public var batteryChargeLimit: Int = 100 // 60%, 80%, or 100%
+    @Published public var isAsusSMCChargeLimitSupported: Bool = false
     @Published public var cpuHistory: [Double] = Array(repeating: 5.0, count: 24)
 
     private var timer: Timer?
     private var prevCpuLoad: host_cpu_load_info?
 
     private init() {
+        checkAsusSMCSupport()
         fetchSystemSpecs()
         refreshTelemetry()
         startPolling()
@@ -191,11 +128,18 @@ public final class TelemetryService: ObservableObject {
         stopPolling()
     }
 
+    private func checkAsusSMCSupport() {
+        var size: size_t = 0
+        let res = sysctlbyname("hw.asus.battery.charging_threshold", nil, &size, nil, 0)
+        isAsusSMCChargeLimitSupported = (res == 0)
+    }
+
     public func startPolling() {
         stopPolling()
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             self?.refreshTelemetry()
         }
+        timer?.tolerance = 0.5
     }
 
     public func stopPolling() {
@@ -226,20 +170,6 @@ public final class TelemetryService: ObservableObject {
                 // Update fan telemetry
                 self.updateFanTelemetry(cpuPercent: newCpu.totalUsagePercent)
             }
-        }
-    }
-
-    public static func openInTerminal(command: String) {
-        let escaped = command.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
-        let script = """
-        tell application "Terminal"
-            activate
-            do script "\(escaped)"
-        end tell
-        """
-        if let appleScript = NSAppleScript(source: script) {
-            var error: NSDictionary?
-            appleScript.executeAndReturnError(&error)
         }
     }
 
@@ -347,6 +277,7 @@ public final class TelemetryService: ObservableObject {
 
     private func fetchBattery() -> BatteryTelemetryData {
         var data = BatteryTelemetryData()
+        data.isPresent = false
         
         // 1. Query IOKit AppleSmartBattery Service
         let mainPort: mach_port_t
@@ -361,41 +292,43 @@ public final class TelemetryService: ObservableObject {
             if IORegistryEntryCreateCFProperties(service, &props, kCFAllocatorDefault, 0) == KERN_SUCCESS,
                let dict = props?.takeRetainedValue() as? [String: Any] {
                 
-                let designCap = dict["DesignCapacity"] as? Int ?? 4800
-                let maxCap = dict["MaxCapacity"] as? Int ?? (dict["AppleRawMaxCapacity"] as? Int ?? 4416)
-                let curCap = dict["CurrentCapacity"] as? Int ?? (dict["AppleRawCurrentCapacity"] as? Int ?? 4080)
-                let cycles = dict["CycleCount"] as? Int ?? 184
-                let isCharging = dict["IsCharging"] as? Bool ?? false
-                let isExternal = dict["ExternalConnected"] as? Bool ?? true
-                let voltage = dict["Voltage"] as? Int ?? 15400
-                let amperage = dict["Amperage"] as? Int ?? (dict["InstantAmperage"] as? Int ?? 1820)
-                let tempRaw = dict["Temperature"] as? Int ?? 2940
-                
-                let health = max(1, min(100, Int((Double(maxCap) / Double(max(1, designCap))) * 100.0)))
-                let wear = max(0, 100 - health)
-                let voltV = Double(voltage) / 1000.0
-                let liveWatts = abs(voltV * (Double(amperage) / 1000.0))
-                let tempC = Double(tempRaw) / 100.0
-                let percent = max(0, min(100, Int((Double(curCap) / Double(max(1, maxCap))) * 100.0)))
-                
-                data.isPresent = true
-                data.currentCapacity = percent
-                data.currentCapacityMAh = curCap
-                data.maxCapacityMAh = maxCap
-                data.designCapacityMAh = designCap
-                data.cycleCount = cycles
-                data.healthPercent = health
-                data.wearPercent = wear
-                data.condition = (health >= 80 ? "Normal" : (health >= 60 ? "Service Recommended" : "Replace Soon"))
-                data.isCharging = isCharging
-                data.isACConnected = isExternal
-                data.powerSourceState = isExternal ? "AC Power Adapter" : "Running on Battery"
-                data.voltageVolts = voltV > 0 ? voltV : 15.4
-                data.amperageMA = amperage
-                data.liveWatts = liveWatts > 0 ? liveWatts : (isCharging ? 28.0 : 14.5)
-                data.temperatureCelsius = (tempC > 0 && tempC < 100) ? tempC : 29.4
-                IOObjectRelease(service)
-                return data
+                let isInstalled = dict["BatteryInstalled"] as? Bool ?? true
+                if isInstalled, let maxCap = dict["MaxCapacity"] as? Int ?? (dict["AppleRawMaxCapacity"] as? Int) {
+                    let designCap = dict["DesignCapacity"] as? Int ?? maxCap
+                    let curCap = dict["CurrentCapacity"] as? Int ?? (dict["AppleRawCurrentCapacity"] as? Int ?? maxCap)
+                    let cycles = dict["CycleCount"] as? Int ?? 0
+                    let isCharging = dict["IsCharging"] as? Bool ?? false
+                    let isExternal = dict["ExternalConnected"] as? Bool ?? true
+                    let voltage = dict["Voltage"] as? Int ?? 15400
+                    let amperage = dict["Amperage"] as? Int ?? (dict["InstantAmperage"] as? Int ?? 0)
+                    let tempRaw = dict["Temperature"] as? Int ?? 2940
+                    
+                    let health = max(1, min(100, Int((Double(maxCap) / Double(max(1, designCap))) * 100.0)))
+                    let wear = max(0, 100 - health)
+                    let voltV = Double(voltage) / 1000.0
+                    let liveWatts = abs(voltV * (Double(amperage) / 1000.0))
+                    let tempC = Double(tempRaw) / 100.0
+                    let percent = max(0, min(100, Int((Double(curCap) / Double(max(1, maxCap))) * 100.0)))
+                    
+                    data.isPresent = true
+                    data.currentCapacity = percent
+                    data.currentCapacityMAh = curCap
+                    data.maxCapacityMAh = maxCap
+                    data.designCapacityMAh = designCap
+                    data.cycleCount = cycles
+                    data.healthPercent = health
+                    data.wearPercent = wear
+                    data.condition = (health >= 80 ? "Normal" : (health >= 60 ? "Service Recommended" : "Replace Soon"))
+                    data.isCharging = isCharging
+                    data.isACConnected = isExternal
+                    data.powerSourceState = isExternal ? "AC Power Adapter" : "Running on Battery"
+                    data.voltageVolts = voltV > 0 ? voltV : 15.4
+                    data.amperageMA = amperage
+                    data.liveWatts = liveWatts
+                    data.temperatureCelsius = (tempC > 0 && tempC < 100) ? tempC : 29.4
+                    IOObjectRelease(service)
+                    return data
+                }
             }
             IOObjectRelease(service)
         }
@@ -407,18 +340,23 @@ public final class TelemetryService: ObservableObject {
             if count > 0, let source = CFArrayGetValueAtIndex(sources, 0) {
                 let sourceRef = unsafeBitCast(source, to: CFTypeRef.self)
                 if let desc = IOPSGetPowerSourceDescription(snapshot, sourceRef)?.takeUnretainedValue() as NSDictionary? {
-                    let current = desc[kIOPSCurrentCapacityKey as String] as? Int ?? 85
+                    if let isPresent = desc[kIOPSIsPresentKey as String] as? Bool, !isPresent {
+                        data.isPresent = false
+                        return data
+                    }
+                    let current = desc[kIOPSCurrentCapacityKey as String] as? Int ?? 0
+                    let maxCap = desc[kIOPSMaxCapacityKey as String] as? Int ?? 100
                     let isCharging = desc[kIOPSIsChargingKey as String] as? Bool ?? false
                     let powerState = desc[kIOPSPowerSourceStateKey as String] as? String ?? ""
                     let isAC = (powerState == kIOPSACPowerValue)
                     let timeRem = desc[kIOPSTimeToEmptyKey as String] as? Int
                     
                     data.isPresent = true
-                    data.currentCapacity = current
+                    data.currentCapacity = maxCap > 0 ? Int((Double(current) / Double(maxCap)) * 100.0) : current
                     data.isCharging = isCharging
                     data.isACConnected = isAC
                     data.powerSourceState = isAC ? "AC Power Adapter" : "Running on Battery"
-                    data.timeRemainingMinutes = (timeRem ?? -1) > 0 ? timeRem : 42
+                    data.timeRemainingMinutes = (timeRem ?? -1) > 0 ? timeRem : nil
                 }
             }
         }
@@ -441,70 +379,78 @@ public final class TelemetryService: ObservableObject {
     // MARK: - Fan & Thermal Control Handlers
 
     private func updateFanTelemetry(cpuPercent: Double) {
-        var baseRpm = 2200
-        var temp = 42 + Int(cpuPercent * 0.45)
-        var decibels = 24 + Int(cpuPercent * 0.22)
+        // Query live hardware sensors from AppleSMC / VirtualSMC
+        let smc = SMCReader.shared
+        let realCpuTemp = smc.readCPUTemperature()
+        let realCpuFan = smc.readFanRPM(index: 0)
+        let realMaxFan = smc.readMaxFanRPM(index: 0)
 
-        switch self.fan.fanMode {
-        case .auto:
-            switch self.activeProfile {
-            case .silent:
-                baseRpm = 1600 + Int(cpuPercent * 12)
-                decibels = 22 + Int(cpuPercent * 0.1)
-            case .balanced:
-                baseRpm = 2200 + Int(cpuPercent * 20)
-                decibels = 28 + Int(cpuPercent * 0.18)
-            case .turbo:
-                baseRpm = 3800 + Int(cpuPercent * 18)
-                decibels = 38 + Int(cpuPercent * 0.15)
-            }
-        case .overboost:
-            baseRpm = 5400
-            temp = max(38, temp - 6)
-            decibels = 48
-        case .quiet:
-            baseRpm = 1800
-            decibels = 20
-        case .manual:
-            let pct = max(0.2, min(1.0, self.fan.manualSpeedPercent / 100.0))
-            baseRpm = Int(Double(self.fan.maxFanRPM) * pct)
-            decibels = 20 + Int(pct * 30)
+        if let maxR = realMaxFan, maxR > 1000 {
+            self.fan.maxFanRPM = Int(maxR)
         }
 
-        let jitter = Int.random(in: -30...30)
-        self.fan.cpuFanRPM = max(1200, min(self.fan.maxFanRPM, baseRpm + jitter))
-        self.fan.gpuFanRPM = max(1100, min(self.fan.maxFanRPM, Int(Double(baseRpm) * 0.95) + jitter))
+        let temp: Int
+        if let realT = realCpuTemp {
+            temp = Int(realT.rounded())
+            self.fan.isRealHardwareThermals = true
+        } else {
+            temp = 42 + Int(cpuPercent * 0.45)
+            self.fan.isRealHardwareThermals = false
+        }
+
+        // Check if SMC exposes live hardware fan tachometers
+        if let rCpuFan = realCpuFan, rCpuFan > 0 {
+            self.fan.isRealFanRPM = true
+            self.fan.fanRPM = Int(rCpuFan)
+        } else {
+            // Physical EC thermal response curve
+            self.fan.isRealFanRPM = false
+            var baseRpm = 2200
+            if temp < 52 {
+                baseRpm = 1800
+            } else if temp < 75 {
+                baseRpm = 2200 + Int(Double(temp - 52) * 20.0)
+            } else {
+                baseRpm = min(self.fan.maxFanRPM, 2700 + Int(Double(temp - 75) * 30.0))
+            }
+            let jitter = Int.random(in: -15...15)
+            self.fan.fanRPM = max(1400, min(self.fan.maxFanRPM, baseRpm + jitter))
+        }
+
         self.fan.cpuTempCelsius = temp
-        self.fan.gpuTempCelsius = max(36, temp - 4)
-        self.fan.acousticDecibels = decibels
+
+        // Calculate real thermal headroom until 100°C Tjunction threshold
+        let headroom = max(0, min(100, 100 - temp))
+        self.fan.thermalHeadroomPercent = headroom
+
+        // Determine autonomous hardware cooling phase
+        let phase: String
+        if temp < 52 {
+            phase = "Quiet Airflow"
+        } else if temp < 75 {
+            phase = "Active Cooling"
+        } else {
+            phase = "Thermal Turbo"
+        }
+        self.fan.coolingPhaseTitle = phase
     }
 
-    public func setFanMode(_ mode: ROGFanMode) {
-        self.fan.fanMode = mode
-        self.updateFanTelemetry(cpuPercent: self.cpuLoad.totalUsagePercent)
-    }
-
-    public func setManualFanSpeed(_ percent: Double) {
-        self.fan.manualSpeedPercent = percent
-        self.fan.fanMode = .manual
-        self.updateFanTelemetry(cpuPercent: self.cpuLoad.totalUsagePercent)
-    }
-
-    // MARK: - Profile Switching Handlers
-
-    public func setPerformanceProfile(_ profile: ROGPerformanceProfile) {
-        self.activeProfile = profile
-        // Coordinate with AuraService
-        AuraService.shared.applyPerformanceProfile(profile)
-        self.updateFanTelemetry(cpuPercent: self.cpuLoad.totalUsagePercent)
-    }
+    // MARK: - Display Calibration Profile Handlers
 
     public func setDisplayProfile(_ profile: ROGDisplayProfile) {
         self.activeDisplayProfile = profile
+        DisplayCalibrationService.shared.applyProfile(profile)
     }
 
     public func setBatteryChargeLimit(_ limit: Int) {
         self.batteryChargeLimit = limit
         UserDefaults.standard.set(limit, forKey: "Aura_BatteryChargeLimit")
+
+        // Attempt writing to AsusSMC sysctl if supported
+        var val = Int32(limit)
+        let res = sysctlbyname("hw.asus.battery.charging_threshold", nil, nil, &val, MemoryLayout<Int32>.size)
+        if res == 0 {
+            NSLog("[ROGAuraTelemetry] Successfully applied AsusSMC battery charge limit: %d%%", limit)
+        }
     }
 }

@@ -232,16 +232,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         quitItem.target = self
         menu.addItem(quitItem)
 
-        statusItem.menu = menu
-        buttonPopMenu(sender)
-    }
-
-    private func buttonPopMenu(_ sender: NSStatusBarButton) {
-        statusItem.button?.performClick(nil)
-        // Clean up menu on main queue after tracking
-        DispatchQueue.main.async { [weak self] in
-            self?.statusItem.menu = nil
-        }
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.height + 4), in: sender)
     }
 
     @objc private func openMainWindowAction() {

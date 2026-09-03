@@ -166,20 +166,21 @@ public struct AuraPopoverView: View {
                     )
                 }
 
-                // 4. Performance Profile 3-Way Segmented Control
+                // 4. GameVisual Display Calibration Control
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("PERFORMANCE PROFILE")
+                    Text("GAMEVISUAL CALIBRATION")
                         .font(.system(size: 9, weight: .bold))
                         .foregroundColor(.secondary.opacity(0.8))
 
                     HStack(spacing: 2) {
-                        ForEach(ROGPerformanceProfile.allCases) { profile in
-                            PopoverProfileButton(
+                        ForEach(ROGDisplayProfile.allCases) { profile in
+                            PopoverDisplayProfileButton(
                                 profile: profile,
-                                isSelected: telemetry.activeProfile == profile
+                                isSelected: telemetry.activeDisplayProfile == profile
                             ) {
                                 withAnimation(.easeInOut(duration: 0.15)) {
-                                    telemetry.setPerformanceProfile(profile)
+                                    telemetry.setDisplayProfile(profile)
+                                    HUDService.shared.showMessage(icon: "eye.fill", text: profile.title, color: .blue)
                                 }
                             }
                         }
@@ -271,20 +272,12 @@ public struct AuraPopoverView: View {
     }
 }
 
-// MARK: - Popover Profile Button
+// MARK: - Popover Display Profile Button
 
-struct PopoverProfileButton: View {
-    let profile: ROGPerformanceProfile
+struct PopoverDisplayProfileButton: View {
+    let profile: ROGDisplayProfile
     let isSelected: Bool
     let action: () -> Void
-
-    private var activeColor: Color {
-        switch profile {
-        case .silent: return Color(red: 0.08, green: 0.72, blue: 0.45)
-        case .balanced: return Color.blue
-        case .turbo: return Color(red: 0.92, green: 0.08, blue: 0.18)
-        }
-    }
 
     var body: some View {
         Button(action: action) {
@@ -293,7 +286,7 @@ struct PopoverProfileButton: View {
                     .font(.system(size: 9, weight: .semibold))
                     .foregroundColor(isSelected ? .white : .secondary)
 
-                Text(profile.title.components(separatedBy: " ").first ?? profile.title)
+                Text(shortName(profile))
                     .font(.system(size: 9.5, weight: isSelected ? .semibold : .regular))
                     .foregroundColor(isSelected ? .white : .primary)
             }
@@ -301,10 +294,19 @@ struct PopoverProfileButton: View {
             .padding(.vertical, 4)
             .background(
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(isSelected ? activeColor : Color.clear)
+                    .fill(isSelected ? Color.blue : Color.clear)
             )
         }
         .buttonStyle(PlainButtonStyle())
+    }
+
+    private func shortName(_ p: ROGDisplayProfile) -> String {
+        switch p {
+        case .standard: return "Def"
+        case .vividGaming: return "Vivid"
+        case .eyeCare: return "Eye"
+        case .cinema: return "Film"
+        }
     }
 }
 

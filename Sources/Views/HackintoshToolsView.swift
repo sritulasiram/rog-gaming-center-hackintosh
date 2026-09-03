@@ -63,9 +63,9 @@ struct DiagnosticsHealthBar: View {
                 HStack(spacing: 10) {
                     HealthBadge(title: "IOKit USB", ok: service.isConnected)
                     HealthBadge(title: "ITE 8910", ok: service.isConnected)
+                    HealthBadge(title: "AppleSMC", ok: SMCReader.shared.isAvailable)
                     HealthBadge(title: "ROG Key HID", ok: service.isConnected && service.isROGKeyEnabled)
-                    HealthBadge(title: "Sleep Daemon", ok: true)
-                    HealthBadge(title: "CLI Binary", ok: true)
+                    HealthBadge(title: "Input TCC", ok: !service.permissionDenied)
                 }
             }
 
@@ -297,28 +297,37 @@ struct SleepWakeWatchdogTimeline: View {
                 .buttonStyle(PlainButtonStyle())
             }
 
-            // Timeline Event Rows
+            // Dynamic Watchdog Audit Log
             VStack(spacing: 6) {
-                TimelineEventRow(
-                    time: service.lastResyncTime.isEmpty ? "10:35:02" : service.lastResyncTime,
-                    icon: "bolt.fill",
-                    color: .green,
-                    text: "Dispatched 'ASUS Tech.Inc.' initialization handshake (Ack in 16ms)"
-                )
+                if service.watchdogAuditLog.isEmpty {
+                    Text("No watchdog events logged yet. Triggering handshakes or system sleep/wake will appear here live.")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                        .padding(8)
+                } else {
+                    ForEach(service.watchdogAuditLog.reversed()) { event in
+                        HStack(spacing: 8) {
+                            Text(event.formattedTime)
+                                .font(.system(size: 9, design: .monospaced))
+                                .foregroundColor(.secondary)
 
-                TimelineEventRow(
-                    time: "10:35:01",
-                    icon: "sun.max.fill",
-                    color: .yellow,
-                    text: "Received NSWorkspace.didWakeNotification (macOS Wake Event)"
-                )
+                            Image(systemName: event.icon)
+                                .font(.system(size: 9))
+                                .foregroundColor(color(for: event.iconColor))
 
-                TimelineEventRow(
-                    time: "10:28:14",
-                    icon: "moon.fill",
-                    color: .indigo,
-                    text: "Received NSWorkspace.willSleepNotification (Display & USB Suspended)"
-                )
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(event.title)
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundColor(.primary)
+                                Text(event.detail)
+                                    .font(.system(size: 9))
+                                    .foregroundColor(.secondary)
+                            }
+
+                            Spacer()
+                        }
+                    }
+                }
             }
             .padding(8)
             .background(Color(NSColor.controlBackgroundColor).opacity(0.6))
@@ -331,6 +340,17 @@ struct SleepWakeWatchdogTimeline: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color(NSColor.separatorColor).opacity(0.5), lineWidth: 0.5)
         )
+    }
+
+    private func color(for name: String) -> Color {
+        switch name {
+        case "green": return .green
+        case "blue": return .blue
+        case "orange": return .orange
+        case "purple": return .purple
+        case "red": return .red
+        default: return .secondary
+        }
     }
 }
 
@@ -431,24 +451,7 @@ struct CLIAutomationGeneratorCard: View {
                         .buttonStyle(PlainButtonStyle())
                         .help("Execute directly in native app")
 
-                        // 2. Open in Terminal
-                        Button(action: {
-                            TelemetryService.openInTerminal(command: item.cmd)
-                        }) {
-                            HStack(spacing: 3) {
-                                Image(systemName: "terminal")
-                                Text("Terminal")
-                            }
-                            .font(.system(size: 10, weight: .medium))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color(NSColor.controlColor).opacity(0.8))
-                            .cornerRadius(5)
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .help("Open and execute in macOS Terminal.app")
-
-                        // 3. Copy Command
+                        // 2. Copy Command
                         Button(action: {
                             NSPasteboard.general.clearContents()
                             NSPasteboard.general.setString(item.cmd, forType: .string)

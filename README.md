@@ -6,7 +6,7 @@
 
 <p align="center">
   <b>The Complete Native Swift Control Suite for ASUS ROG & TUF Laptops on macOS</b><br/>
-  <i>Featuring macOS Tahoe Liquid Glass Aesthetics, Real-Time Hardware Telemetry, 4-Zone Aura RGB Studio, Dual-Fan Acoustic Monitoring, Performance Profiles, Sleep/Wake Auto-Repair Watchdog, and Standalone CLI Automation.</i>
+  <i>Featuring macOS Tahoe Liquid Glass Aesthetics, 100% Genuine Silicon Telemetry, 2-Column Aura Core Studio, Autonomous EC Cooling Telemetry, Pure Fn Physical Function Keys, Floating Capsule OSD HUD, and Standalone CLI Automation.</i>
 </p>
 
 <p align="center">
@@ -31,15 +31,17 @@
 - [System Architecture](#system-architecture)
 - [Design System & Aesthetics](#design-system--aesthetics)
 - [Key Features & Modules](#key-features--modules)
-  - [1. Live Telemetry Dashboard](#1-live-telemetry-dashboard)
-  - [2. 4-Zone Aura RGB Lighting Studio](#2-4-zone-aura-rgb-lighting-studio)
-  - [3. Power, Cooling & Acoustic Management](#3-power-cooling--acoustic-management)
-  - [4. Dedicated Hardware ROG Key Launcher (IOKit Native)](#4-dedicated-hardware-rog-key-launcher-iokit-native)
-  - [5. Hackintosh Tools & IOKit Packet Stream Inspector](#5-hackintosh-tools--iokit-packet-stream-inspector)
-  - [6. System Preferences & Startup Configuration](#6-system-preferences--startup-configuration)
-  - [7. Liquid Glass Menu Bar Companion Popover](#7-liquid-glass-menu-bar-companion-popover)
-  - [8. Sleep / Wake Auto-Repair Watchdog](#8-sleep--wake-auto-repair-watchdog)
-  - [9. Standalone Native CLI (`rogauracore`)](#9-standalone-native-cli-rogauracore)
+  - [1. Windows-Inspired 3-Column Dashboard (Zero Placebos)](#1-windows-inspired-3-column-dashboard-zero-placebos)
+  - [2. Aura Core 2-Column Lighting Studio](#2-aura-core-2-column-lighting-studio)
+  - [3. Power, Cooling & Autonomous EC Management](#3-power-cooling--autonomous-ec-management)
+  - [4. Pure Fn Physical Function Keys Suite](#4-pure-fn-physical-function-keys-suite)
+  - [5. macOS Tahoe Floating Capsule OSD HUD](#5-macos-tahoe-floating-capsule-osd-hud)
+  - [6. CoreGraphics Display Calibration (GameVisual)](#6-coregraphics-display-calibration-gamevisual)
+  - [7. Dedicated Hardware ROG Key Launcher (IOKit Native)](#7-dedicated-hardware-rog-key-launcher-iokit-native)
+  - [8. Hackintosh Tools & IOKit Packet Stream Inspector](#8-hackintosh-tools--iokit-packet-stream-inspector)
+  - [9. Liquid Glass Menu Bar Companion Popover](#9-liquid-glass-menu-bar-companion-popover)
+  - [10. Sleep / Wake Auto-Repair Watchdog](#10-sleep--wake-auto-repair-watchdog)
+  - [11. Standalone Native CLI (`rogauracore`)](#11-standalone-native-cli-rogauracore)
 - [Supported Hardware & Compatibility](#supported-hardware--compatibility)
   - [Primary Verified Testbed](#primary-verified-testbed)
   - [Architecturally Compatible Models](#architecturally-compatible-models-ite-usb-hid-protocol)
@@ -64,7 +66,9 @@ Official ASUS utility software (*Armoury Crate* and *ROG Gaming Center*) is stri
 - **Zero External Dependencies:** No Python, no libusb, no Electron, no Node.js runtime, and no C bridging headers.
 - **Direct Kernel-Level Communication:** Communicates directly with internal ASUS USB HID microcontrollers via Apple's native **IOKit HID Manager** (`IOHIDManager` / `IOHIDDeviceSetReport`).
 - **Hardware Safety & Latency Control:** Enforces strict 10ms FIFO micro-delay transaction queues to guarantee proper ITE 8910 PWM register latching without bus lockup.
-- **TCC Privacy Resilience:** Native detection of macOS Input Monitoring permissions (`kIOReturnNotPermitted`) with one-click deep links to System Settings.
+- **100% Genuine Hardware Data (Zero Placebos):** No fake discrete GPU telemetry, no placebo memory cleaners, and no non-functional CPU power sliders. Every statistic is polled live from active kernel frameworks (`AppleSMC`, Mach VM, Mach host load, and `AppleSmartBattery`).
+- **Pure Physical Fn Hotkey Suite:** Full physical function key support matching the Windows keyboard legends with pure `Fn` actuation and zero extra modifier keys needed.
+- **macOS Tahoe Floating Capsule OSD HUD:** Modern Dynamic Island-style bezel pill overlays for all hardware toggles and brightness adjustments.
 - **macOS Tahoe "Liquid Glass" UI:** Implements modern frosted glass vibrancy, Apple Control Center-inspired bento cards, continuous squircles, and SF Symbols typography.
 
 ---
@@ -77,17 +81,13 @@ Official ASUS utility software (*Armoury Crate* and *ROG Gaming Center*) is stri
 +---------------------------------------------------------------------------------------------------+
 |  [APPLE SIDEBAR] |                                [MAIN CONTENT AREA]                             |
 |                  |                                                                                |
-|  FAVORITES       |  [Hero Header: ASUS ROG Strix GL503GE • Hardware Online]                       |
-|  - Dashboard     |  - Live Dual-Fan Tachometers (RPM), CPU/GPU Thermals, 3-Way Profile Switcher   |
-|  - Aura RGB      |                                                                                |
-|    Studio        |  [Bento Telemetry Grid]                                                        |
-|  - Power & Fans  |  - CPU Load % with 24-point rolling sparkline waveform (User / System split)   |
-|  - Hackintosh    |  - Memory Allocation: Apple Activity Monitor style (App / Wired / Compressed)  |
-|    Tools         |  - Battery & Power: Real-time Wattage (+AC Charging / Discharge), Health & Wear |
-|  - Settings      |                                                                                |
-|                  |  [Bottom HUD Modules]                                                          |
-|  [ITE 8910]      |  - 4-Zone Live Backlight Glowing Map (WASD, Center-L, Center-R, Numpad)        |
-|  [Re-Sync]       |  - Hardware Specifications: CPU Topology, RAM, Controller, System Uptime       |
+|  - Dashboard     |  [3-COLUMN COMMAND CENTER]                                                     |
+|  - Aura Core     |  - Col 1: System Specs (i7-8750H, 16GB, macOS Tahoe) & Battery Flow (Live W)   |
+|  - Power & Fans  |  - Col 2: AppleSMC Silicon Die Temp (TC0P), Headroom %, EC RPM & Mach Wave     |
+|  - Hackintosh    |  - Col 3: Dual Glowing Circular Dials (CPU Load % & Mach RAM Utilization)      |
+|    Tools         |                                                                                |
+|  - Settings      |  [BOTTOM HARDWARE DOCK]                                                        |
+|                  |  - Backlight Power (ON/OFF) • 4-Step Brightness • Aura Preset • GameVisual LUT |
 +---------------------------------------------------------------------------------------------------+
 ```
 
@@ -95,28 +95,29 @@ Official ASUS utility software (*Armoury Crate* and *ROG Gaming Center*) is stri
 
 ```
 +--------------------------------------------------------------------+
-|  UI Layer: SwiftUI Views (MainWindowView, AuraStudio, Popover)     |
+|  UI Layer: SwiftUI Views (Dashboard, AuraCore, PowerFans, Popover) |
 +--------------------------------------------------------------------+
                                   │
                                   ▼
 +--------------------------------------------------------------------+
-|  Service Layer: AuraService & TelemetryService (ObservableObjects) |
-|  - State Management, Preset JSON Storage, Sleep/Wake Listeners     |
-|  - IOPS Power Source Monitoring, Mach Kernel Host Statistics       |
+|  Service Layer: AuraService, TelemetryService & HUDService         |
+|  - State Management, Sleep/Wake Watchdog, Global Fn Key Monitor    |
+|  - CoreGraphics Display Gamma Calibration, AppleSmartBattery Poller|
 +--------------------------------------------------------------------+
                                   │
                                   ▼
 +--------------------------------------------------------------------+
-|  Driver Layer: AuraDriver (IOKit HID Manager Engine)               |
-|  - Device Matching (VID 0x0B05, Known PIDs, Usage Pages >= 0xFF00) |
+|  Driver Layer: AuraDriver & SMCReader (IOKit HID & AppleSMC Engine)|
+|  - Device Matching (VID 0x0B05, PID 0x1869, Usage Page 0xFF89)     |
 |  - FIFO Serial Queue with 10ms Micro-Delay Register Latching       |
-|  - TCC Permission State Monitoring (kIOReturnNotPermitted Check)   |
+|  - Direct AppleSMC TC0P Kernel Register Access                     |
 +--------------------------------------------------------------------+
                                   │
                                   ▼
 +--------------------------------------------------------------------+
-|  Hardware Layer: ITE 8910 / 8291 USB HID Keyboard Controller       |
-|  - 17-Byte Raw Feature Reports: Handshake -> Brightness -> Payload |
+|  Hardware Layer: ITE 8910 USB Controller & Motherboard ITE 8987 EC |
+|  - 17-Byte Feature Reports: Handshake -> Brightness -> Set -> Latch|
+|  - Autonomous Hardware Fan Curve (Coffee Lake DTS Silicon Plate)   |
 +--------------------------------------------------------------------+
 ```
 
@@ -126,75 +127,98 @@ Official ASUS utility software (*Armoury Crate* and *ROG Gaming Center*) is stri
 
 The interface is engineered around Apple Human Interface Guidelines and modern **macOS Tahoe "Liquid Glass"** visual aesthetics:
 
-- **Apple-Native Sidebar:**
-  - Zero dead-space geometry integrating behind macOS traffic light buttons (`.fullSizeContentView`).
+- **Apple-Native Minimalist Sidebar:**
+  - Single clean Apple HIG navigation list without artificial group labels or bottom status box clutter.
+  - Aligned under window traffic light buttons (`.fullSizeContentView`).
   - Monochromatic SF Symbols with continuous rounded squircles (`RoundedRectangle(cornerRadius: 6, style: .continuous)`).
-  - Apple `.sidebar` vibrancy material with subtle system accent tinting.
+- **Windows-Inspired 3-Column Command Stage:**
+  - Homage to the official Windows ROG Gaming Center layout, adapted with clean typography, dark frosted materials, and zero clutter.
+- **Aura Core 2-Column Studio:**
+  - Homage to the official ASUS AURA Windows design: 70% width GL503 keyboard stage on the left, dedicated controls and red `APPLY` button on the right.
+- **Floating Capsule OSD HUD:**
+  - Modern Dynamic Island-style floating pill capsule at the bottom-center of the screen with smooth spring animations.
 - **Liquid Glass Menu Bar Popover:**
   - Ultra-compact geometry (`290 × 320 pt`) with transient background dimming.
-  - Fluid glowing circular power orb with soft emerald radial luminescence.
-  - Dual-vitals bento cards displaying Fan RPM/Thermals and Battery %/Wattage.
-  - Apple Control Center-style keyboard brightness capsule slider with embedded glyphs.
-  - 3-Way dynamic performance profile switcher (Emerald for Silent, Sapphire for Balanced, Crimson for Turbo).
-- **Interactive Visual Feedback:**
-  - Live 24-point rolling CPU waveform sparkline graphs.
-  - Segmented RAM pressure bar (App, Wired, Compressed, Free).
-  - Interactive 4-zone keycap map with real-time RGB glow simulation.
+  - Glowing circular power orb, dual vitals bento cards, brightness capsule slider, and GameVisual display LUT switcher.
 
 ---
 
 ## Key Features & Modules
 
-### 1. Live Telemetry Dashboard
-- **Hero Banner:** Real-time hardware identity (`ASUS ROG Strix GL503GE`), connection state indicator, CPU name, RAM capacity, dual-fan RPM, and silicon thermal readouts.
-- **CPU Load & Sparkline:** Mach host statistics (`host_cpu_load_info`) providing live total usage percentage, User vs. System tick breakdown, core/thread topology, and a 24-point rolling sparkline waveform.
-- **Memory Allocation Bar:** 64-bit Mach VM statistics (`vm_statistics64`) displayed in Apple Activity Monitor style (App Memory, Wired Memory, Compressed Memory, and Free Memory).
-- **Battery & Power Flow:** IOKit `AppleSmartBattery` and `IOPS` integration tracking live power draw in Watts (`Voltage × Amperage`), AC adapter connection state, chemical wear percentage, full design capacity vs. raw maximum capacity, and cycle counts.
-- **Backlight HUD:** Live glowing indicator orbs for all 4 keyboard zones with power toggle and one-click hardware re-sync buttons.
-- **Hardware Specs HUD:** Processor brand, memory configuration, operating system build, keyboard controller descriptor, and kernel uptime.
+### 1. Windows-Inspired 3-Column Dashboard (Zero Placebos)
+- **Column 1 (Hardware Specification & Battery Telemetry):**
+  - Processor brand, 6-Core / 12-Thread topology, 16 GB Dual-Channel DDR4, ASUS ROG Strix GL503GE model identity, and kernel uptime.
+  - Genuine IOKit `AppleSmartBattery` telemetry: Live power draw in Watts ($V \times A$), voltage, health percentage, cycle count, and charging state.
+- **Column 2 (Silicon Thermal Stage - Hero Readout):**
+  - Direct read from kernel `AppleSMC` silicon die register (`TC0P`) with verified `[SMC]` badge.
+  - Real-time Thermal Headroom percentage ($100 - T_{\text{die}}$) calculating distance to the 100°C junction thermal limit.
+  - Dual Blower Cooling Array phase indicator (`🟢 Quiet Airflow < 52°C`, `🟡 Active Cooling 52–75°C`, `🔴 Thermal Turbo > 75°C`) and autonomous hardware EC RPM.
+  - 24-point live rolling CPU load waveform based on Mach kernel host ticks.
+- **Column 3 (Dual Circular Gauges):**
+  - **CPU Activity Dial:** Glowing circular progress ring tracking total Mach CPU load percentage.
+  - **RAM Memory Dial:** Glowing circular progress ring tracking 64-bit Mach VM allocated memory (Active + Wired + Compressed / Total).
+- **Bottom Hardware Tray (Windows Dock Homage):**
+  - 4 quick hardware control cards: Backlight Power (ON/OFF), 4-step Brightness (`0`, `33%`, `66%`, `100%`), Aura Core mode with quick cycle, and GameVisual display calibration.
 
-### 2. 4-Zone Aura RGB Lighting Studio
-- **Interactive Keyboard Chassis:** Vector-rendered laptop keycap visualizer with distinct zone regions:
-  - **Zone 1:** WASD & Left cluster (`ESC`, `TAB`, `CAPS`, `SHIFT`, `W`, `A`, `S`, `D`, `Z`, `X`, `C`)
-  - **Zone 2:** Center typing region (`4-7`, `T-U`, `F-J`, `V-M`)
-  - **Zone 3:** Right navigation region (`8-DEL`, `O-]`, `K-ENT`, `, - SHIFT`)
-  - **Zone 4:** Numpad, arrow keys & lightbar cluster
-- **Effects & Dynamics Engine:**
-  - **Single Static Color:** Solid uniform color across the whole chassis.
-  - **4-Zone Custom Static:** Individual HEX colors per zone.
-  - **Spectrum Color Cycle:** Hardware-native continuous rainbow cycling (Hardware Mode `0x02`).
-  - **Rainbow Wave:** 4-zone rolling spectrum wave.
-  - **Single & Multi Breathing:** Dual-color and 4-zone crossfade pulsing (Hardware Mode `0x01`).
-  - **Strobing Flash:** Hardware strobe effect (Hardware Mode `0x0A`).
-  - **Stealth Off:** Complete LED shutdown preventing default firmware maroon fallback.
-- **Color Studio:**
-  - Live HEX code input field with uppercase auto-formatting.
-  - Scope switcher: Apply instantly to **All Zones** or target a specific zone (**WASD**, **Center-L**, **Center-R**, **Numpad**).
-  - 15 curated gaming swatches (*ROG Crimson, Neon Cyan, Matrix Green, Vaporwave Pink, Ice Blue, Gold, etc.*).
-  - Native macOS System Color Wheel integration (`NSColorPanel`).
-- **Lighting Scenes & Preset Gallery:**
-  - **12 Built-in Designer Presets:** *Spectrum Cycle, Rainbow Wave, Cyberpunk 2077, Republic of Gamers, Sunset Glow, Emerald Aurora, Toxic Matrix, Fire & Ice, Synthwave Glow, Ocean Breathing, Dragon Breath, White Lightning*.
-  - **Custom Preset Studio:** Create, name, save, apply, and delete custom 4-zone lighting scenes with persistent JSON serialization.
+### 2. Aura Core 2-Column Lighting Studio
+- **2-Column Layout (Zero Vertical Scrolling):**
+  - Fits the application window comfortably with everything accessible in a single glance.
+- **70% Left Stage (Physical GL503 Keyboard Canvas):**
+  - Vector GL503 keyboard chassis framed inside technical crop brackets (`┌ ┐ └ ┘`).
+  - Dedicated top hotkeys (Volume -, Volume +, Mic Mute, ROG Key).
+  - 4 physical lighting zones: Zone 1 (WASD), Zone 2 (Center-L), Zone 3 (Center-R), Zone 4 (Numpad).
+  - In `4-ZONE CUSTOM` mode, clicking any zone selects it and presents an inline quick-color palette, custom hex field, and native macOS color wheel (`NSColorPanel`).
+- **30% Right Panel (Controls Stack):**
+  - **Brightness Selector:** Segmented bar (`Off`, `33%`, `66%`, `100%`).
+  - **Effects Radio List:** Matches official ASUS AURA modes: `Static`, `Breathing`, `Color Cycle`, `Rainbow`, and `Strobing`.
+  - **Tempo (Speed):** 3 speed notches (`Slow`, `Medium`, `Fast`).
+  - **Apply Button:** Prominent red button that commits 17-byte HID packets directly to the ITE 8910 controller with visual confirmation.
 
-### 3. Power, Cooling & Acoustic Management
-- **Dual Fan Tachometer HUD:** Real-time RPM readout for CPU and GPU cooling fans with circular progress gauges and DTS thermal sensor monitoring.
-- **Acoustic Fan Modes:**
-  - **Auto (Adaptive):** Dynamic RPM curve governed by thermal load and performance profile.
-  - **Overboost (Max Cooling):** Locks fans at high RPM (`5,400+ RPM`) for intense gaming or compiling.
-  - **Quiet (Stealth):** Caps fan RPM (`~1,800 RPM`) for silent operation.
-  - **Manual Fixed:** Granular duty-cycle slider (`20% - 100%`) with live acoustic decibel estimation (`dB`).
-- **ROG Performance Profiles:**
-  - **Silent (Eco Mode):** Lower thermal limits, quiet fan curve, and auto-dimmed keyboard backlight (33%) for maximum battery endurance.
-  - **Balanced Mode:** Standard clock frequencies, dynamic fan curves, and balanced lighting.
-  - **Turbo (ROG Gaming Mode):** Uncapped power limits (PL1/PL2), aggressive cooling curves, and 100% Aura brightness.
-- **Battery Care Mode (Lithium-Ion Protection):**
-  - Limit maximum AC charging threshold to **60% (Max Lifespan)**, **80% (Balanced)**, or **100% (Full Capacity)** to mitigate battery swelling and chemical wear.
-- **Smart Battery Saver:**
-  - Background `IOPSNotificationCreateRunLoopSource` listener that automatically dims the backlight to 33% when unplugged from AC power and seamlessly restores your preferred brightness upon reconnection.
-- **GameVisual Display Profiles:**
-  - Quick-switch display calibration modes: *Default Standard, Vivid Gaming, Eye Care (Warm), Cinema Rich*.
+### 3. Power, Cooling & Autonomous EC Management
+- **Dual Blower Cooling Array:** Real-time RPM readout for the shared thermal cooling plate governed by Intel Coffee Lake DTS silicon junction curves.
+- **Autonomous Hardware EC Management:** Full technical transparency into the motherboard ITE IT8987 Embedded Controller on hardware ports `0x62`/`0x66`:
+  - **Quiet Airflow (< 52°C):** ~1,800 RPM whisper-quiet operation.
+  - **Active Cooling (52–75°C):** ~2,400 RPM balanced acoustic profile.
+  - **Thermal Turbo (> 75°C):** Up to 3,315 RPM maximum heat dissipation.
+- **Smart Battery Saver:** Automatically dims the keyboard backlight to 33% when unplugged from AC power and restores full brightness upon reconnecting.
 
-### 4. Dedicated Hardware ROG Key Launcher (IOKit Native)
+### 4. Pure Fn Physical Function Keys Suite
+Enjoy complete physical keyboard hotkey integration matching the printed ASUS Windows legends using **pure `Fn` key actuation** (zero extra modifiers required):
+
+| Physical Hotkey | Printed Legend | Action |
+| :--- | :--- | :--- |
+| **`Fn + Up Arrow`** (↑) / **`Fn + F8`** | Backlight Up | Steps keyboard brightness UP (Off -> 33% -> 66% -> 100%) |
+| **`Fn + Down Arrow`** (↓) / **`Fn + F7`** | Backlight Down | Steps keyboard brightness DOWN (100% -> 66% -> 33% -> Off) |
+| **`Fn + Right Arrow`** (→) | Aura Mode Next | Cycles next RGB animation (`Static` -> `Breathing` -> `Cycle` -> `Rainbow` -> `Strobe`) |
+| **`Fn + Left Arrow`** (←) | Aura Mode Prev | Cycles previous RGB animation |
+| **`Fn + Space`** | Backlight Power | Instantly toggles keyboard backlight on/off (Mute / Wake) |
+| **`Fn + F1`** | Audio Mute | Toggles macOS system audio mute |
+| **`Fn + F2` / `Fn + F3`** | Volume Down / Up | Steps macOS system volume down / up |
+| **`Fn + F4` / `Fn + F5`** | Display Dim / Bright | Steps laptop screen display brightness down / up |
+| **`Fn + F6`** | Touchpad Toggle | Toggles trackpad on/off |
+| **`Fn + F9`** | Screen Lock | Immediately locks the macOS screen |
+| **`Fn + F11`** | System Sleep | Puts macOS to sleep |
+| **Physical ROG Key** | ROG Logo | Instantly opens / toggles the ROG Gaming Center window |
+
+### 5. macOS Tahoe Floating Capsule OSD HUD
+- Built with a non-activating, click-through `NSPanel` (`level: .floating`) that floats seamlessly over all full-screen apps and games.
+- Provides immediate visual feedback with smooth spring animations for:
+  - Keyboard backlight brightness levels (with 4-step progress fill)
+  - Backlight power on/off
+  - Aura Core lighting mode switches
+  - Touchpad enabled / disabled
+  - System volume & mute
+  - Display brightness adjustments
+  - Screen lock confirmation
+
+### 6. CoreGraphics Display Calibration (GameVisual)
+- Direct display transfer table calibration via `CGGetDisplayTransferByTable` and `CGSetDisplayTransferByTable`:
+  - **Default Standard:** Restores native factory gamma transfer curves.
+  - **Eye Care (Warm):** Attenuates harsh blue 450nm spectral spikes (~22% reduction) for nighttime reading comfort.
+  - **Vivid Gaming:** Steepens midtone contrast curve for vibrant in-game visual clarity.
+  - **Cinema Mode:** Lifts shadow detail and enriches deeper tone gradients.
+
+### 7. Dedicated Hardware ROG Key Launcher (IOKit Native)
 - **Direct ITE 8910 Hardware Interception:** Intercepts hardware input report `0x5A` payload `0x38` (`UsagePage: 0xFF31`, `Usage: 0x0038`) emitted by the physical ROG / Armoury Crate keyboard button via Apple's native `IOHIDManager`.
 - **Zero Daemon & Zero ACPI Hacks:** Requires no Karabiner-Elements, no external key daemons, and no custom DSDT/SSDT EC method re-routes.
 - **Configurable One-Touch Actions:**
@@ -204,7 +228,7 @@ The interface is engineered around Apple Human Interface Guidelines and modern *
   - **Toggle Backlight Power:** Instant night-mode backlight shutoff.
 - **Hardware Debouncing:** Enforces 250ms hardware debounce to prevent duplicate triggers on physical key actuation.
 
-### 5. Hackintosh Tools & IOKit Packet Stream Inspector
+### 8. Hackintosh Tools & IOKit Packet Stream Inspector
 - **System Readiness Health Bar:** Instant visual diagnostic indicators for IOKit USB HID matching, ITE 8910 controller presence, ROG key HID listener state, sleep watchdog daemon status, and CLI binary installation.
 - **One-Click Self Test:** Dispatches test transactions and validates hardware response.
 - **Live 17-Byte Feature Report Inspector:**
@@ -219,23 +243,16 @@ The interface is engineered around Apple Human Interface Guidelines and modern *
 - **Automation Shortcuts & Terminal Launcher:**
   - Direct execution ("Run Now" button) or external Terminal execution ("Terminal" button) for common scripting routines.
 
-### 6. System Preferences & Startup Configuration
-- **Open at Login:** Automatically installs a clean launch agent to `~/Library/LaunchAgents/com.asus.roggamingcenter.plist`.
-- **Close to Tray:** Closing the main window keeps the status item, menu bar popover, and sleep watchdog active in the background.
-- **Dedicated ROG Hardware Key Setup:** Enable/disable physical key listener and select default action with live hardware connection indicators.
-- **Startup Defaults:** Configure your preferred default lighting preset and toggle hardware initialization handshakes on boot.
-- **Global Hotkey Reference:** Quick guide for brightness adjustment and backlight toggling.
-
-### 7. Liquid Glass Menu Bar Companion Popover
+### 9. Liquid Glass Menu Bar Companion Popover
 - Discreet status icon in the macOS menu bar.
-- Left-click triggers the rich `290 × 320 pt` Liquid Glass Popover with live RPM, thermals, battery telemetry, brightness slider, profile switcher, and preset chips.
+- Left-click triggers the rich `290 × 320 pt` Liquid Glass Popover with live EC cooling status, thermals, battery telemetry, brightness slider, GameVisual display LUT profiles, and quick hardware actions.
 - Right-click or Control-click reveals a fast native context menu with brightness levels, preset submenus, hardware re-sync, and quit actions.
 
-### 8. Sleep / Wake Auto-Repair Watchdog
+### 10. Sleep / Wake Auto-Repair Watchdog
 - **The Issue:** ASUS ITE 8910 / 8291 USB HID controllers lose volatile register state when resuming from macOS system sleep (entering an unlit or default maroon state).
 - **The Fix:** An automatic background observer monitors `NSWorkspace.didWakeNotification`, `screensDidWakeNotification`, and `sessionDidBecomeActiveNotification`. After a 600ms debounce, it re-transmits the `"ASUS Tech.Inc."` handshake and reapplies the user's active lighting profile with zero manual intervention.
 
-### 9. Standalone Native CLI (`rogauracore`)
+### 11. Standalone Native CLI (`rogauracore`)
 - Bundled pure Swift command-line tool with zero external runtime dependencies.
 - Perfect for shell scripts, Terminal aliases, keyboard shortcut daemons (skhd), Alfred workflows, Raycast script commands, and Elgato Stream Deck integrations.
 
@@ -405,20 +422,23 @@ rog-gaming-center/
 │   ├── rog_emblem_red.svg         # Vector ROG Red Emblem
 │   └── rog_emblem_white.svg       # Vector ROG White Emblem
 ├── Sources/
-│   ├── main.swift                 # App Lifecycle, NSStatusItem & Menu Bar Setup
-│   ├── AuraProtocol.swift         # 17-Byte Packet Builder, RGB Models, Modes & Presets
+│   ├── main.swift                 # App Lifecycle, NSWindow, NSStatusItem & Key Router
+│   ├── AuraProtocol.swift         # 17-Byte Packet Builder, RGB Models, Modes & Curves
 │   ├── AuraDriver.swift           # Native IOKit HID Manager, Device Matching & Micro-Delays
-│   ├── AuraService.swift          # Core Service: State Management, Presets, Sleep Watchdog
-│   ├── TelemetryService.swift     # Telemetry Engine: CPU Load, Memory, Battery & Fan RPM
+│   ├── AuraService.swift          # Core Service: Pure Fn Hotkeys, Presets, Sleep Watchdog
+│   ├── SMCReader.swift            # Direct AppleSMC Kernel Hardware Access (TC0P Thermals)
+│   ├── DisplayCalibrationService.swift # CoreGraphics Gamma Table Calibration (GameVisual)
+│   ├── HUDService.swift           # macOS Tahoe Floating Capsule OSD HUD Engine
+│   ├── TelemetryService.swift     # Telemetry Engine: CPU Load, Mach VM, AppleSmartBattery
 │   ├── AuraCLI.swift              # Standalone 'rogauracore' CLI Binary Entry Point
 │   ├── AuraPopoverView.swift      # Liquid Glass Menu Bar Companion Popover View
 │   └── Views/
-│       ├── MainWindowView.swift   # Main App Window, Apple Sidebar & Tab Router
-│       ├── DashboardView.swift    # Bento Telemetry Grid, Sparkline & Hardware Specs
-│       ├── AuraStudioView.swift   # 4-Zone Keycap Chassis Visualizer, Color Studio & Presets
-│       ├── PowerFanView.swift     # Dual Fan Tachometer HUD, Performance Profiles, Battery Care
-│       ├── HackintoshToolsView.swift # IOKit Packet Inspector, Console Timeline & CLI Launcher
-│       ├── SettingsView.swift     # Launch at Login, Defaults & Hotkeys
+│       ├── MainWindowView.swift   # Main App Window, Minimalist Apple Sidebar & Routing
+│       ├── DashboardView.swift    # Windows 3-Column Command Center, Sparkline & Vitals
+│       ├── AuraStudioView.swift   # Windows 2-Column Aura Core Studio & GL503 Key Matrix
+│       ├── PowerFanView.swift     # Dual Blower Array, Autonomous EC Curves & Diagnostics
+│       ├── HackintoshToolsView.swift # IOKit Packet Inspector, Console Timeline & Tools
+│       ├── SettingsView.swift     # Launch at Login, ASUS ROG Function Keys Cheat Sheet
 │       └── ROGLogoView.swift      # Vector ROG Fearless Eye Shape & Image Loader
 └── Tests/
     └── test_backend.swift         # Hardware & IOKit HID Validation Suite
