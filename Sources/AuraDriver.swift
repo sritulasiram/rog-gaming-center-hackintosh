@@ -121,10 +121,18 @@ public final class AuraDriver {
         updatePermissionStatus(from: openResult)
     }
 
+    private let keyLock = NSLock()
+
     public func handleROGKeyPress() {
+        keyLock.lock()
         let now = Date().timeIntervalSince1970
-        guard now - lastROGKeyPressTimestamp > 0.25 else { return }
-        lastROGKeyPressTimestamp = now
+        let elapsed = now - lastROGKeyPressTimestamp
+        if elapsed > 0.25 {
+            lastROGKeyPressTimestamp = now
+        }
+        keyLock.unlock()
+
+        guard elapsed > 0.25 else { return }
         NSLog("[ROGAuraDriver] 🕹️ Hardware ROG Key press detected (Usage 0x0038 / Report 0x5A)")
         DispatchQueue.main.async { [weak self] in
             self?.onROGKeyPressed?()
@@ -141,10 +149,10 @@ public final class AuraDriver {
         default:
             newStatus = .unknown
         }
-        guard newStatus != permissionStatus else { return }
-        permissionStatus = newStatus
         DispatchQueue.main.async { [weak self] in
-            self?.onPermissionStatusChanged?(newStatus)
+            guard let self = self, newStatus != self.permissionStatus else { return }
+            self.permissionStatus = newStatus
+            self.onPermissionStatusChanged?(newStatus)
         }
     }
 
@@ -222,6 +230,22 @@ public final class AuraDriver {
 
     // MARK: - Transaction Dispatch Engine
 
+    /// Acquires an exclusive advisory file lock across processes to prevent packet collisions
+    public static func withHardwareLock<T>(_ body: () throws -> T) rethrows -> T {
+        let lockPath = "/tmp/com.asus.rogauracore.lock"
+        let fd = open(lockPath, O_CREAT | O_RDWR, 0o666)
+        if fd >= 0 {
+            flock(fd, LOCK_EX)
+        }
+        defer {
+            if fd >= 0 {
+                flock(fd, LOCK_UN)
+                close(fd)
+            }
+        }
+        return try body()
+    }
+
     /// Sends a sequence of 17-byte HID Feature Reports with guaranteed FIFO micro-delays
     public func sendPackets(_ packets: [[UInt8]], completion: ((Bool) -> Void)? = nil) {
         queue.async { [weak self] in
@@ -238,19 +262,22 @@ public final class AuraDriver {
 
             var allSucceeded = true
             var sawPermissionDenial = false
-            for dev in devices {
-                for pkt in packets {
-                    var buffer = pkt
-                    let repID = CFIndex(buffer[0])
-                    let res = IOHIDDeviceSetReport(dev, kIOHIDReportTypeFeature, repID, &buffer, buffer.count)
-                    if res != kIOReturnSuccess {
-                        allSucceeded = false
-                        if res == kIOReturnNotPermitted || res == kIOReturnExclusiveAccess {
-                            sawPermissionDenial = true
+
+            Self.withHardwareLock {
+                for dev in devices {
+                    for pkt in packets {
+                        var buffer = pkt
+                        let repID = CFIndex(buffer[0])
+                        let res = IOHIDDeviceSetReport(dev, kIOHIDReportTypeFeature, repID, &buffer, buffer.count)
+                        if res != kIOReturnSuccess {
+                            allSucceeded = false
+                            if res == kIOReturnNotPermitted || res == kIOReturnExclusiveAccess {
+                                sawPermissionDenial = true
+                            }
                         }
+                        // Crucial 10ms micro-delay to ensure ITE 8910 PWM register latching
+                        usleep(10000)
                     }
-                    // Crucial 10ms micro-delay to ensure ITE 8910 PWM register latching
-                    usleep(10000)
                 }
             }
 

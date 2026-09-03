@@ -17,9 +17,12 @@ mkdir -p "$MACOS" "$RESOURCES"
 
 # 1. Compile Native ROG Gaming Center Application
 echo "-> Compiling $APP_NAME Windowed Application..."
-swiftc -O -framework IOKit -framework Cocoa -framework SwiftUI -framework Foundation \
+swiftc -O -framework IOKit -framework Cocoa -framework SwiftUI -framework Foundation -framework ApplicationServices \
     ./Sources/AuraProtocol.swift \
     ./Sources/AuraDriver.swift \
+    ./Sources/SMCReader.swift \
+    ./Sources/DisplayCalibrationService.swift \
+    ./Sources/HUDService.swift \
     ./Sources/TelemetryService.swift \
     ./Sources/AuraService.swift \
     ./Sources/Views/ROGLogoView.swift \
@@ -112,9 +115,15 @@ EOF
 # Set SIGNING_IDENTITY below to a certificate from `security find-identity -v
 # -p codesigning` (a free self-signed "Apple Development" cert or a local
 # Keychain cert both work) for a grant that survives rebuilds. Falls back to
-# ad-hoc (-) if none is set, which still lets TCC prompt correctly on THIS
-# build, but you'll need to re-grant permission after every future rebuild.
-SIGNING_IDENTITY="${SIGNING_IDENTITY:--}"
+if [ -z "$SIGNING_IDENTITY" ]; then
+    DETECTED_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | grep "Apple Development" | head -1 | awk -F '"' '{print $2}')
+    if [ -n "$DETECTED_IDENTITY" ]; then
+        SIGNING_IDENTITY="$DETECTED_IDENTITY"
+        echo "-> Auto-detected code-signing identity: $SIGNING_IDENTITY"
+    else
+        SIGNING_IDENTITY="-"
+    fi
+fi
 
 echo "-> Code-signing app bundle (identity: $SIGNING_IDENTITY)..."
 # NOTE: deliberately NOT using --options runtime (hardened runtime) and NOT

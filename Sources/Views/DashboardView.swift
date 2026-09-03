@@ -8,34 +8,41 @@ public struct DashboardView: View {
     public init() {}
 
     public var body: some View {
-        ScrollView(.vertical, showsIndicators: true) {
-            VStack(spacing: 14) {
-                // 1. Top Hero: System Identity & Power Profile Switcher
-                DashboardHeroBanner()
-
-                // 2. Telemetry Bento Grid (3 Cards: CPU, Memory, Power)
-                HStack(spacing: 12) {
-                    CPUTelemetryCard()
-                    MemoryTelemetryCard()
+        VStack(spacing: 14) {
+            // 3-Column Command Stage (Homage to Windows ROG Gaming Center)
+            HStack(alignment: .top, spacing: 14) {
+                // LEFT COLUMN: Hardware Specification & Battery
+                VStack(spacing: 12) {
+                    SystemArchitectureCard()
                     BatteryTelemetryCard()
                 }
+                .frame(maxWidth: .infinity)
 
-                // 3. Bottom Modules: Keyboard Lighting HUD & Hardware Specs
-                HStack(spacing: 12) {
-                    KeyboardBacklightHUDCard()
-                    HardwareSpecsCard()
-                }
+                // CENTER COLUMN: Silicon Thermal Stage (Hero die temp, headroom, EC phase, sparkline)
+                SiliconThermalStageCard()
+                    .frame(maxWidth: .infinity)
+
+                // RIGHT COLUMN: Dual Glowing Circular Dials (CPU Load & RAM)
+                CircularGaugesCard()
+                    .frame(width: 240)
             }
-            .padding(18)
+
+            Spacer()
+
+            // BOTTOM TRAY: Quick Hardware Controls (Windows Bottom Dock Homage - Real Controls Only)
+            QuickHardwareDock()
         }
+        .padding(.horizontal, 18)
+        .padding(.top, 4)
+        .padding(.bottom, 14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
-// MARK: - 1. Top Hero: System Identity & Power Profile Switcher
+// MARK: - Column 1: System Architecture
 
-struct DashboardHeroBanner: View {
+struct SystemArchitectureCard: View {
     @ObservedObject var telemetry = TelemetryService.shared
-    @ObservedObject var service = AuraService.shared
 
     private var cleanCPUName: String {
         let raw = telemetry.specs.cpuBrand
@@ -47,515 +54,512 @@ struct DashboardHeroBanner: View {
     }
 
     var body: some View {
-        VStack(spacing: 12) {
-            HStack(alignment: .center) {
-                HStack(spacing: 12) {
-                    ROGLogoView(size: 32)
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack(spacing: 6) {
-                            Text("ASUS ROG Strix GL503GE")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(.primary)
-
-                            Circle()
-                                .fill(service.isConnected ? Color.green : Color.orange)
-                                .frame(width: 6, height: 6)
-
-                            Text(service.isConnected ? "Hardware Online" : "Controller Standby")
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundColor(.secondary)
-                        }
-
-                        HStack(spacing: 8) {
-                            Text("\(cleanCPUName) • \(telemetry.specs.totalRAMGB) GB RAM")
-                                .font(.system(size: 11))
-                                .foregroundColor(.secondary)
-
-                            Text("•")
-                                .font(.system(size: 10))
-                                .foregroundColor(.secondary.opacity(0.5))
-
-                            HStack(spacing: 3) {
-                                Image(systemName: "fanblades.fill")
-                                    .font(.system(size: 9))
-                                    .foregroundColor(.blue)
-                                Text("\(telemetry.fan.cpuFanRPM) RPM")
-                                    .font(.system(size: 10, weight: .medium, design: .monospaced))
-                                    .foregroundColor(.primary)
-                            }
-
-                            HStack(spacing: 3) {
-                                Image(systemName: "thermometer.medium")
-                                    .font(.system(size: 9))
-                                    .foregroundColor(.orange)
-                                Text("\(telemetry.fan.cpuTempCelsius)°C")
-                                    .font(.system(size: 10, weight: .medium, design: .monospaced))
-                                    .foregroundColor(.primary)
-                            }
-                        }
-                    }
-                }
-
-                Spacer()
-
-                // 3-Way Segmented Profile Control
-                HStack(spacing: 2) {
-                    ForEach(ROGPerformanceProfile.allCases) { profile in
-                        ProfileSegmentButton(
-                            profile: profile,
-                            isSelected: (telemetry.activeProfile == profile)
-                        ) {
-                            withAnimation(.easeInOut(duration: 0.15)) {
-                                telemetry.setPerformanceProfile(profile)
-                            }
-                        }
-                    }
-                }
-                .padding(3)
-                .background(Color(NSColor.controlBackgroundColor).opacity(0.6))
-                .cornerRadius(8)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color(NSColor.separatorColor).opacity(0.4), lineWidth: 0.5)
-                )
-            }
-        }
-        .padding(14)
-        .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(NSColor.separatorColor).opacity(0.4), lineWidth: 0.5)
-        )
-    }
-}
-
-struct ProfileSegmentButton: View {
-    let profile: ROGPerformanceProfile
-    let isSelected: Bool
-    let action: () -> Void
-
-    private var activeColor: Color {
-        switch profile {
-        case .silent: return Color(red: 0.08, green: 0.72, blue: 0.45)
-        case .balanced: return Color.blue
-        case .turbo: return Color(red: 0.92, green: 0.08, blue: 0.18)
-        }
-    }
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 5) {
-                Image(systemName: profile.icon)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(isSelected ? .white : .secondary)
-
-                Text(profile.title.components(separatedBy: " ").first ?? profile.title)
-                    .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
-                    .foregroundColor(isSelected ? .white : .primary)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(isSelected ? activeColor : Color.clear)
-            )
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-}
-
-// MARK: - 2. Telemetry Bento Cards
-
-// CPU Card with Live Sparkline Waveform
-struct CPUTelemetryCard: View {
-    @ObservedObject var telemetry = TelemetryService.shared
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Label("CPU Load", systemImage: "cpu")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.blue)
-
-                Spacer()
-
-                Text("\(telemetry.specs.physicalCores)C / \(telemetry.specs.logicalThreads)T")
-                    .font(.system(size: 10, weight: .regular))
-                    .foregroundColor(.secondary)
-            }
-
-            Text(String(format: "%.1f%%", telemetry.cpuLoad.totalUsagePercent))
-                .font(.system(size: 26, weight: .bold, design: .rounded))
-                .foregroundColor(.primary)
-
-            // Sparkline Graph
-            SparklineView(data: telemetry.cpuHistory, tintColor: .blue)
-                .frame(height: 38)
-
-            Text("System: \(Int(telemetry.cpuLoad.systemPercent))% • User: \(Int(telemetry.cpuLoad.userPercent))%")
-                .font(.system(size: 9))
-                .foregroundColor(.secondary)
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(NSColor.separatorColor).opacity(0.4), lineWidth: 0.5)
-        )
-    }
-}
-
-// Memory Card with Segmented Pressure Bar
-struct MemoryTelemetryCard: View {
-    @ObservedObject var telemetry = TelemetryService.shared
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Label("Memory", systemImage: "memorychip")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.blue)
-
-                Spacer()
-
-                Text(String(format: "%.0f GB Total", telemetry.memory.totalGB))
-                    .font(.system(size: 10, weight: .regular))
-                    .foregroundColor(.secondary)
-            }
-
-            Text(String(format: "%.1f GB", telemetry.memory.activeGB + telemetry.memory.wiredGB + telemetry.memory.compressedGB))
-                .font(.system(size: 26, weight: .bold, design: .rounded))
-                .foregroundColor(.primary)
-
-            // Apple Activity Monitor style memory allocation bar
-            GeometryReader { geo in
-                let total = max(1.0, telemetry.memory.totalGB)
-                let activeW = CGFloat(telemetry.memory.activeGB / total) * geo.size.width
-                let wiredW = CGFloat(telemetry.memory.wiredGB / total) * geo.size.width
-                let compW = CGFloat(telemetry.memory.compressedGB / total) * geo.size.width
-
-                HStack(spacing: 2) {
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.blue)
-                        .frame(width: max(2, activeW))
-
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color(red: 0.1, green: 0.75, blue: 0.85))
-                        .frame(width: max(2, wiredW))
-
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.orange)
-                        .frame(width: max(2, compW))
-
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.secondary.opacity(0.2))
-                }
-            }
-            .frame(height: 8)
-            .padding(.vertical, 8)
-
-            HStack(spacing: 8) {
-                Circle().fill(Color.blue).frame(width: 5, height: 5)
-                Text("App").font(.system(size: 9)).foregroundColor(.secondary)
-
-                Circle().fill(Color(red: 0.1, green: 0.75, blue: 0.85)).frame(width: 5, height: 5)
-                Text("Wired").font(.system(size: 9)).foregroundColor(.secondary)
-
-                Spacer()
-
-                Text(String(format: "%.0f%% Used", telemetry.memory.usedPercent))
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundColor(.secondary)
-            }
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(NSColor.separatorColor).opacity(0.4), lineWidth: 0.5)
-        )
-    }
-}
-
-// Battery & Power Card
-struct BatteryTelemetryCard: View {
-    @ObservedObject var telemetry = TelemetryService.shared
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Label("Battery & Power", systemImage: telemetry.battery.isCharging ? "bolt.fill" : "battery.100")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(telemetry.battery.isCharging ? .green : (telemetry.battery.isACConnected ? .blue : .orange))
-
-                Spacer()
-
-                Text(telemetry.battery.isACConnected ? "AC Adapter" : "Battery")
-                    .font(.system(size: 10, weight: .regular))
-                    .foregroundColor(.secondary)
-            }
-
-            Text("\(telemetry.battery.currentCapacity)%")
-                .font(.system(size: 26, weight: .bold, design: .rounded))
-                .foregroundColor(.primary)
-
-            // Progress bar
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.secondary.opacity(0.15))
-                        .frame(height: 8)
-
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(telemetry.battery.isCharging ? Color.green : (telemetry.battery.isACConnected ? Color.blue : (telemetry.battery.currentCapacity > 20 ? Color.blue : Color.red)))
-                        .frame(width: max(4, geo.size.width * CGFloat(telemetry.battery.currentCapacity) / 100.0), height: 8)
-                }
-            }
-            .frame(height: 8)
-            .padding(.vertical, 8)
-
-            HStack {
-                Text(telemetry.battery.isCharging ? String(format: "+%.1f W (AC Charging)", telemetry.battery.liveWatts) : (telemetry.battery.isACConnected ? String(format: "%.1f W (AC Adapter)", telemetry.battery.liveWatts) : String(format: "%.1f W (Battery)", telemetry.battery.liveWatts)))
-                    .font(.system(size: 9))
-                    .foregroundColor(.secondary)
-
-                Spacer()
-
-                Text("Health: \(telemetry.battery.healthPercent)% (\(telemetry.battery.wearPercent)% Wear)")
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundColor(.secondary)
-            }
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(NSColor.separatorColor).opacity(0.4), lineWidth: 0.5)
-        )
-    }
-}
-
-// Sparkline Mini Waveform View
-struct SparklineView: View {
-    let data: [Double]
-    let tintColor: Color
-
-    var body: some View {
-        GeometryReader { geo in
-            let points = data.isEmpty ? [0.0] : data
-            let maxVal = max(100.0, (points.max() ?? 100.0))
-            let stepX = geo.size.width / CGFloat(max(1, points.count - 1))
-
-            Path { path in
-                for (index, val) in points.enumerated() {
-                    let x = CGFloat(index) * stepX
-                    let y = geo.size.height - (CGFloat(val / maxVal) * geo.size.height)
-                    if index == 0 {
-                        path.move(to: CGPoint(x: x, y: y))
-                    } else {
-                        path.addLine(to: CGPoint(x: x, y: y))
-                    }
-                }
-            }
-            .stroke(tintColor, style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
-
-            // Subtle gradient area fill
-            Path { path in
-                path.move(to: CGPoint(x: 0, y: geo.size.height))
-                for (index, val) in points.enumerated() {
-                    let x = CGFloat(index) * stepX
-                    let y = geo.size.height - (CGFloat(val / maxVal) * geo.size.height)
-                    path.addLine(to: CGPoint(x: x, y: y))
-                }
-                path.addLine(to: CGPoint(x: geo.size.width, y: geo.size.height))
-                path.closeSubpath()
-            }
-            .fill(LinearGradient(
-                colors: [tintColor.opacity(0.25), tintColor.opacity(0.0)],
-                startPoint: .top,
-                endPoint: .bottom
-            ))
-        }
-    }
-}
-
-// MARK: - 3. Bottom Modules: Keyboard Lighting HUD & Hardware Specs
-
-struct KeyboardBacklightHUDCard: View {
-    @ObservedObject var service = AuraService.shared
-
-    private var brightnessString: String {
-        if !service.isPoweredOn || service.currentBrightness == 0 {
-            return "Turned Off"
-        }
-        switch service.currentBrightness {
-        case 3: return "Active (100%)"
-        case 2: return "Active (66%)"
-        case 1: return "Active (33%)"
-        default: return "Active (\(service.currentBrightness * 33)%)"
-        }
-    }
-
-    private let zoneNames = ["WASD", "Center-L", "Center-R", "Numpad"]
-    private let defaultSpectrum = [
-        Color(red: 1.0, green: 0.0, blue: 0.5),   // Neon Pink
-        Color(red: 0.55, green: 0.1, blue: 1.0),  // Purple
-        Color(red: 0.0, green: 0.95, blue: 1.0),  // Cyan
-        Color(red: 0.0, green: 0.5, blue: 1.0)    // Blue
-    ]
-
-    private func displayColor(for idx: Int) -> Color {
-        guard service.isPoweredOn else { return Color.gray.opacity(0.3) }
-        switch service.currentMode {
-        case .colorCycle, .rainbow:
-            return defaultSpectrum[min(idx, 3)]
-        case .singleStatic(let c):
-            return Color(rgb: c)
-        case .multiStatic(let zones):
-            return idx < zones.count ? Color(rgb: zones[idx]) : defaultSpectrum[idx]
-        default:
-            return idx < service.zoneColors.count ? Color(rgb: service.zoneColors[idx]) : defaultSpectrum[idx]
-        }
-    }
-
-    var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Label("Keyboard Backlight", systemImage: "keyboard")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.primary)
-
+                Label("SYSTEM ARCHITECTURE", systemImage: "cpu")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(.secondary)
                 Spacer()
-
-                Text(brightnessString)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(service.isPoweredOn ? .green : .secondary)
+                Text("GL503GE")
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(Color.red.opacity(0.18))
+                    .foregroundColor(.red)
+                    .cornerRadius(4)
             }
 
-            // 4-Zone Orb Row with live RGB colors
-            HStack(spacing: 8) {
-                ForEach(0..<4) { idx in
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(displayColor(for: idx))
-                            .frame(width: 9, height: 9)
-                            .shadow(color: service.isPoweredOn ? displayColor(for: idx).opacity(0.65) : Color.clear, radius: 4)
-
-                        Text(zoneNames[idx])
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 6)
-                    .background(Color(NSColor.controlBackgroundColor).opacity(0.6))
-                    .cornerRadius(6)
-                }
-            }
-
-            HStack(spacing: 6) {
-                Button(action: { service.togglePower() }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "power")
-                        Text(service.isPoweredOn ? "Turn Off" : "Turn On")
-                    }
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(service.isPoweredOn ? .red : .green)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 4)
-                }
-                .buttonStyle(PlainButtonStyle())
-                .background(Color(NSColor.controlColor).opacity(0.8))
-                .cornerRadius(6)
-
-                Button(action: { service.forceHardwareResync() }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.triangle.2.circlepath")
-                        Text("Re-Sync")
-                    }
-                    .font(.system(size: 10, weight: .medium))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 4)
-                }
-                .buttonStyle(PlainButtonStyle())
-                .background(Color(NSColor.controlColor).opacity(0.8))
-                .cornerRadius(6)
+            VStack(alignment: .leading, spacing: 6) {
+                SpecRow(title: "Processor", value: cleanCPUName)
+                SpecRow(title: "Topology", value: "\(telemetry.specs.physicalCores) Cores · \(telemetry.specs.logicalThreads) Threads")
+                SpecRow(title: "Memory", value: "\(telemetry.specs.totalRAMGB) GB DDR4 · 2667 MHz")
+                SpecRow(title: "Operating System", value: telemetry.specs.osVersion)
+                SpecRow(title: "Kernel Uptime", value: telemetry.specs.uptimeString)
             }
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
-        .cornerRadius(12)
+        .padding(12)
+        .background(Color(NSColor.controlBackgroundColor).opacity(0.45))
+        .cornerRadius(10)
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(NSColor.separatorColor).opacity(0.4), lineWidth: 0.5)
-        )
-    }
-}
-
-struct HardwareSpecsCard: View {
-    @ObservedObject var telemetry = TelemetryService.shared
-    @ObservedObject var service = AuraService.shared
-
-    private var cleanCPU: String {
-        let raw = telemetry.specs.cpuBrand
-        return raw.replacingOccurrences(of: "(R)", with: "")
-                  .replacingOccurrences(of: "(TM)", with: "")
-                  .replacingOccurrences(of: "CPU", with: "")
-                  .trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Label("Hardware Specifications", systemImage: "info.circle")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.primary)
-
-                Spacer()
-            }
-
-            VStack(spacing: 6) {
-                SpecRow(label: "Processor", value: cleanCPU)
-                SpecRow(label: "Memory", value: "\(telemetry.specs.totalRAMGB) GB RAM")
-                SpecRow(label: "OS Version", value: telemetry.specs.osVersion)
-                SpecRow(label: "Keyboard Controller", value: service.deviceName)
-                SpecRow(label: "System Uptime", value: telemetry.specs.uptimeString)
-            }
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: 10)
                 .stroke(Color(NSColor.separatorColor).opacity(0.4), lineWidth: 0.5)
         )
     }
 }
 
 struct SpecRow: View {
-    let label: String
+    let title: String
     let value: String
+
+    init(title: String, value: String) {
+        self.title = title
+        self.value = value
+    }
+
+    init(label: String, value: String) {
+        self.title = label
+        self.value = value
+    }
 
     var body: some View {
         HStack {
-            Text(label)
-                .font(.system(size: 11))
+            Text(title)
+                .font(.system(size: 10.5))
                 .foregroundColor(.secondary)
             Spacer()
             Text(value)
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 10.5, weight: .medium, design: .monospaced))
                 .foregroundColor(.primary)
-                .lineLimit(1)
         }
     }
 }
 
+// MARK: - Column 1: Battery Telemetry
+
+struct BatteryTelemetryCard: View {
+    @ObservedObject var telemetry = TelemetryService.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label("LITHIUM BATTERY", systemImage: "battery.100.bolt")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text(telemetry.battery.isCharging ? "Charging" : (telemetry.battery.isACConnected ? "AC Power" : "Battery"))
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundColor(telemetry.battery.isCharging ? .green : .secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                SpecRow(title: "Charge Level", value: "\(telemetry.battery.currentCapacity)%")
+                SpecRow(title: "Live Draw", value: String(format: "%.1f W (%.2fV)", telemetry.battery.liveWatts, telemetry.battery.voltageVolts))
+                SpecRow(title: "Battery Health", value: "\(telemetry.battery.healthPercent)% · \(telemetry.battery.condition)")
+                SpecRow(title: "Cycle Count", value: "\(telemetry.battery.cycleCount)")
+            }
+        }
+        .padding(12)
+        .background(Color(NSColor.controlBackgroundColor).opacity(0.45))
+        .cornerRadius(10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color(NSColor.separatorColor).opacity(0.4), lineWidth: 0.5)
+        )
+    }
+}
+
+// MARK: - Column 2: Center Silicon Thermal Stage
+
+struct SiliconThermalStageCard: View {
+    @ObservedObject var telemetry = TelemetryService.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("SILICON THERMAL STAGE", systemImage: "thermometer.sun.fill")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text("Autonomous EC")
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundColor(.blue)
+            }
+
+            // Hero Dual Readout (Silicon Temp & Thermal Headroom)
+            HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("SILICON DIE")
+                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                        .foregroundColor(.secondary)
+
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                        Text("\(telemetry.fan.cpuTempCelsius)°C")
+                            .font(.system(size: 32, weight: .bold, design: .rounded))
+                            .foregroundColor(tempColor(telemetry.fan.cpuTempCelsius))
+
+                        if telemetry.fan.isRealHardwareThermals {
+                            Text("SMC")
+                                .font(.system(size: 8, weight: .bold))
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 1)
+                                .background(Color.green.opacity(0.2))
+                                .foregroundColor(.green)
+                                .cornerRadius(3)
+                        }
+                    }
+                    Text("Coffee Lake DTS")
+                        .font(.system(size: 9))
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("THERMAL HEADROOM")
+                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                        .foregroundColor(.secondary)
+
+                    Text("\(telemetry.fan.thermalHeadroomPercent)%")
+                        .font(.system(size: 32, weight: .bold, design: .rounded))
+                        .foregroundColor(.blue)
+
+                    Text("Until 100°C Tjunction")
+                        .font(.system(size: 9))
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(12)
+            .background(Color.black.opacity(0.25))
+            .cornerRadius(8)
+
+            // Dual Blower Cooling Array Status
+            HStack {
+                HStack(spacing: 6) {
+                    Image(systemName: "fanblades.fill")
+                        .font(.system(size: 13))
+                        .foregroundColor(.blue)
+
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Dual Blower Cooling Array")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(.primary)
+
+                        Text("Phase: \(telemetry.fan.coolingPhaseTitle)")
+                            .font(.system(size: 9.5))
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                Text("~\(telemetry.fan.fanRPM) RPM")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundColor(.primary)
+            }
+            .padding(10)
+            .background(Color.black.opacity(0.18))
+            .cornerRadius(8)
+
+            // Rolling Mach Load Wave
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("LIVE SILICON LOAD (24-POINT)")
+                        .font(.system(size: 8.5, weight: .semibold, design: .monospaced))
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("\(Int(telemetry.cpuLoad.totalUsagePercent))% Now")
+                        .font(.system(size: 8.5, weight: .bold, design: .monospaced))
+                        .foregroundColor(.blue)
+                }
+
+                GeometryReader { geo in
+                    let points = telemetry.cpuHistory
+                    Path { path in
+                        guard points.count > 1 else { return }
+                        let step = geo.size.width / CGFloat(points.count - 1)
+                        let height = geo.size.height
+
+                        for (index, val) in points.enumerated() {
+                            let norm = min(1.0, max(0.0, val / 100.0))
+                            let y = height - (CGFloat(norm) * (height - 4)) - 2
+                            let x = CGFloat(index) * step
+                            if index == 0 {
+                                path.move(to: CGPoint(x: x, y: y))
+                            } else {
+                                path.addLine(to: CGPoint(x: x, y: y))
+                            }
+                        }
+                    }
+                    .stroke(
+                        LinearGradient(colors: [Color.blue, Color.cyan], startPoint: .leading, endPoint: .trailing),
+                        style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
+                    )
+                }
+                .frame(height: 38)
+            }
+        }
+        .padding(14)
+        .background(Color(NSColor.controlBackgroundColor).opacity(0.45))
+        .cornerRadius(10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color(NSColor.separatorColor).opacity(0.4), lineWidth: 0.5)
+        )
+    }
+
+    private func tempColor(_ temp: Int) -> Color {
+        if temp < 55 { return .green }
+        if temp < 75 { return .orange }
+        return .red
+    }
+}
+
+// MARK: - Column 3: Dual Circular Gauges (Homage to Windows Gauges)
+
+struct CPUDialView: View {
+    let usagePercent: Double
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Text("CPU LOAD")
+                .font(.system(size: 9.5, weight: .bold, design: .monospaced))
+                .foregroundColor(.secondary)
+
+            ZStack {
+                Circle()
+                    .stroke(Color.secondary.opacity(0.2), lineWidth: 9)
+
+                Circle()
+                    .trim(from: 0, to: CGFloat(min(1.0, max(0.0, usagePercent / 100.0))))
+                    .stroke(
+                        LinearGradient(colors: [Color.blue, Color.cyan], startPoint: .topLeading, endPoint: .bottomTrailing),
+                        style: StrokeStyle(lineWidth: 9, lineCap: .round)
+                    )
+                    .rotationEffect(.degrees(-90))
+
+                VStack(spacing: 0) {
+                    Text("\(Int(usagePercent))%")
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .foregroundColor(.primary)
+                    Text("Active")
+                        .font(.system(size: 8))
+                        .foregroundColor(.secondary)
+                }
+            }
+            .frame(width: 82, height: 82)
+
+            Text("Mach Host Ticks")
+                .font(.system(size: 8.5))
+                .foregroundColor(.secondary)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity)
+        .background(Color.black.opacity(0.22))
+        .cornerRadius(8)
+    }
+}
+
+struct RAMDialView: View {
+    let usedPercent: Double
+    let usedGB: Double
+    let totalGB: Double
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Text("RAM UTILIZATION")
+                .font(.system(size: 9.5, weight: .bold, design: .monospaced))
+                .foregroundColor(.secondary)
+
+            ZStack {
+                Circle()
+                    .stroke(Color.secondary.opacity(0.2), lineWidth: 9)
+
+                Circle()
+                    .trim(from: 0, to: CGFloat(min(1.0, max(0.0, usedPercent / 100.0))))
+                    .stroke(
+                        LinearGradient(colors: [Color.purple, Color.pink], startPoint: .topLeading, endPoint: .bottomTrailing),
+                        style: StrokeStyle(lineWidth: 9, lineCap: .round)
+                    )
+                    .rotationEffect(.degrees(-90))
+
+                VStack(spacing: 0) {
+                    Text("\(Int(usedPercent))%")
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .foregroundColor(.primary)
+                    Text(String(format: "%.1fG", usedGB))
+                        .font(.system(size: 8))
+                        .foregroundColor(.secondary)
+                }
+            }
+            .frame(width: 82, height: 82)
+
+            Text("\(String(format: "%.1f", usedGB)) / \(String(format: "%.1f", totalGB)) GB")
+                .font(.system(size: 8.5, weight: .medium, design: .monospaced))
+                .foregroundColor(.secondary)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity)
+        .background(Color.black.opacity(0.22))
+        .cornerRadius(8)
+    }
+}
+
+struct CircularGaugesCard: View {
+    @ObservedObject var telemetry = TelemetryService.shared
+
+    var body: some View {
+        VStack(spacing: 12) {
+            CPUDialView(usagePercent: telemetry.cpuLoad.totalUsagePercent)
+            RAMDialView(usedPercent: telemetry.memory.usedPercent, usedGB: telemetry.memory.usedGB, totalGB: telemetry.memory.totalGB)
+        }
+        .padding(12)
+        .background(Color(NSColor.controlBackgroundColor).opacity(0.45))
+        .cornerRadius(10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color(NSColor.separatorColor).opacity(0.4), lineWidth: 0.5)
+        )
+    }
+}
+
+// MARK: - Bottom Tray: Quick Hardware Controls Dock (Windows Bottom Dock Homage)
+
+struct QuickHardwareDock: View {
+    @ObservedObject var service = AuraService.shared
+    @ObservedObject var telemetry = TelemetryService.shared
+
+    var body: some View {
+        HStack(spacing: 12) {
+            // Card 1: Backlight Power Toggle
+            DockCard(title: "BACKLIGHT POWER", icon: service.isPoweredOn ? "power.circle.fill" : "power.circle") {
+                Button(action: {
+                    service.togglePower()
+                }) {
+                    Text(service.isPoweredOn ? "ON" : "OFF")
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .foregroundColor(service.isPoweredOn ? .white : .secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(service.isPoweredOn ? Color.green : Color(NSColor.controlColor).opacity(0.6))
+                        )
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+
+            // Card 2: Brightness Selector
+            DockCard(title: "BRIGHTNESS", icon: "sun.max.fill") {
+                HStack(spacing: 4) {
+                    DockMiniButton(title: "0", isSelected: !service.isPoweredOn || service.currentBrightness == 0) {
+                        service.setBrightness(0)
+                        HUDService.shared.showBacklightHUD(level: 0)
+                    }
+                    DockMiniButton(title: "33", isSelected: service.isPoweredOn && service.currentBrightness == 1) {
+                        service.setBrightness(1)
+                        HUDService.shared.showBacklightHUD(level: 1)
+                    }
+                    DockMiniButton(title: "66", isSelected: service.isPoweredOn && service.currentBrightness == 2) {
+                        service.setBrightness(2)
+                        HUDService.shared.showBacklightHUD(level: 2)
+                    }
+                    DockMiniButton(title: "100", isSelected: service.isPoweredOn && service.currentBrightness == 3) {
+                        service.setBrightness(3)
+                        HUDService.shared.showBacklightHUD(level: 3)
+                    }
+                }
+            }
+
+            // Card 3: Active Aura Core Mode
+            DockCard(title: "AURA CORE", icon: "sparkles") {
+                HStack {
+                    Text(service.activePresetId.capitalized.replacingOccurrences(of: "_", with: " "))
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+
+                    Spacer()
+
+                    Button(action: {
+                        service.cycleToNextPreset()
+                    }) {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.blue)
+                            .padding(5)
+                            .background(Color.blue.opacity(0.15))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+            }
+
+            // Card 4: GameVisual Display Gamma
+            DockCard(title: "GAMEVISUAL", icon: "eye.fill") {
+                HStack(spacing: 4) {
+                    ForEach(ROGDisplayProfile.allCases) { profile in
+                        Button(action: {
+                            telemetry.setDisplayProfile(profile)
+                            HUDService.shared.showMessage(icon: "eye.fill", text: profile.title, color: .blue)
+                        }) {
+                            Text(profileShortName(profile))
+                                .font(.system(size: 9.5, weight: telemetry.activeDisplayProfile == profile ? .bold : .regular))
+                                .foregroundColor(telemetry.activeDisplayProfile == profile ? .white : .secondary)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 5)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 5)
+                                        .fill(telemetry.activeDisplayProfile == profile ? Color.blue : Color(NSColor.controlColor).opacity(0.6))
+                                )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+        .cornerRadius(10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color(NSColor.separatorColor).opacity(0.4), lineWidth: 0.5)
+        )
+    }
+
+    private func profileShortName(_ profile: ROGDisplayProfile) -> String {
+        switch profile {
+        case .standard: return "Def"
+        case .vividGaming: return "Vivid"
+        case .eyeCare: return "Eye"
+        case .cinema: return "Film"
+        }
+    }
+}
+
+struct DockCard<Content: View>: View {
+    let title: String
+    let icon: String
+    let content: () -> Content
+
+    init(title: String, icon: String, @ViewBuilder content: @escaping () -> Content) {
+        self.title = title
+        self.icon = icon
+        self.content = content
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 9))
+                    .foregroundColor(.secondary)
+                Text(title)
+                    .font(.system(size: 8.5, weight: .bold, design: .monospaced))
+                    .foregroundColor(.secondary)
+            }
+            content()
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+struct DockMiniButton: View {
+    let title: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 10, weight: isSelected ? .bold : .regular, design: .monospaced))
+                .foregroundColor(isSelected ? .white : .secondary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 5)
+                .background(
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(isSelected ? Color.blue : Color(NSColor.controlColor).opacity(0.6))
+                )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}

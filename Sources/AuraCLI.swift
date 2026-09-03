@@ -52,8 +52,8 @@ Examples:
         }
 
         let driver = AuraDriver.shared
-        // Allow brief runloop run to enumerate devices
-        RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        // Allow brief runloop run to enumerate devices reliably
+        RunLoop.current.run(until: Date().addingTimeInterval(0.15))
 
         let cmd = args[1].lowercased()
 

@@ -1,6 +1,7 @@
 import Foundation
 import Cocoa
 import IOKit.ps
+import ServiceManagement
 
 public enum ROGKeyAction: String, CaseIterable, Identifiable, Codable {
     case toggleMainWindow = "toggle_main_window"
@@ -26,6 +27,21 @@ public enum ROGKeyAction: String, CaseIterable, Identifiable, Codable {
         case .cyclePresets: return "sparkles"
         case .toggleBacklightPower: return "power"
         }
+    }
+}
+
+public struct WatchdogAuditEvent: Identifiable, Equatable {
+    public let id = UUID()
+    public let timestamp: Date
+    public let icon: String
+    public let iconColor: String
+    public let title: String
+    public let detail: String
+
+    public var formattedTime: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss"
+        return formatter.string(from: timestamp)
     }
 }
 
@@ -64,23 +80,56 @@ public final class AuraService: ObservableObject {
     @Published public var lastResyncTime: String = "Never"
     @Published public var isPoweredOn: Bool = true
     @Published public var activeEditingZoneIndex: Int = 0 // 0 = Zone 1 (WASD), 1 = Zone 2, etc.
+    @Published public var watchdogAuditLog: [WatchdogAuditEvent] = []
 
     public var onROGKeyActionTriggered: ((ROGKeyAction) -> Void)?
 
     private var powerSourceRunLoopSource: CFRunLoopSource?
     private var sleepWakeDebounceTimer: Timer?
+    private var globalHotKeyMonitor: Any?
+    private var localHotKeyMonitor: Any?
 
     private init() {
         loadSettings()
         setupDriverObservers()
         setupSystemWakeObservers()
         setupPowerSourceMonitoring()
+        setupGlobalHotkeys()
+
+        logWatchdogEvent(
+            icon: "bolt.fill",
+            iconColor: "blue",
+            title: "AuraService Online",
+            detail: "IOKit USB HID matching registered. Watchdog daemon active."
+        )
 
         // Initial device scan & wake handshake
         driver.refreshDevices()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
             self?.driver.initializeKeyboard { _ in
                 self?.reapplyCurrentLighting()
+            }
+        }
+    }
+
+    deinit {
+        if let m = globalHotKeyMonitor { NSEvent.removeMonitor(m) }
+        if let m = localHotKeyMonitor { NSEvent.removeMonitor(m) }
+    }
+
+    public func logWatchdogEvent(icon: String, iconColor: String, title: String, detail: String) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            let event = WatchdogAuditEvent(
+                timestamp: Date(),
+                icon: icon,
+                iconColor: iconColor,
+                title: title,
+                detail: detail
+            )
+            self.watchdogAuditLog.append(event)
+            if self.watchdogAuditLog.count > 40 {
+                self.watchdogAuditLog.removeFirst()
             }
         }
     }
@@ -143,13 +192,28 @@ public final class AuraService: ObservableObject {
     }
 
     public func cycleToNextPreset() {
-        let all = AuraPreset.builtInPresets + customPresets
+        let all = AuraPreset.builtInPresets
         guard !all.isEmpty else { return }
         if let idx = all.firstIndex(where: { $0.id == activePresetId }) {
             let nextIdx = (idx + 1) % all.count
             applyPreset(all[nextIdx])
+            HUDService.shared.showAuraModeHUD(modeName: all[nextIdx].name)
         } else {
             applyPreset(all[0])
+            HUDService.shared.showAuraModeHUD(modeName: all[0].name)
+        }
+    }
+
+    public func cycleToPreviousPreset() {
+        let all = AuraPreset.builtInPresets
+        guard !all.isEmpty else { return }
+        if let idx = all.firstIndex(where: { $0.id == activePresetId }) {
+            let prevIdx = (idx - 1 + all.count) % all.count
+            applyPreset(all[prevIdx])
+            HUDService.shared.showAuraModeHUD(modeName: all[prevIdx].name)
+        } else {
+            applyPreset(all[0])
+            HUDService.shared.showAuraModeHUD(modeName: all[0].name)
         }
     }
 
@@ -168,13 +232,183 @@ public final class AuraService: ObservableObject {
         center.addObserver(self, selector: #selector(handleSystemWake), name: NSWorkspace.didWakeNotification, object: nil)
         center.addObserver(self, selector: #selector(handleSystemWake), name: NSWorkspace.screensDidWakeNotification, object: nil)
         center.addObserver(self, selector: #selector(handleSystemWake), name: NSWorkspace.sessionDidBecomeActiveNotification, object: nil)
+        center.addObserver(self, selector: #selector(handleSystemSleep), name: NSWorkspace.willSleepNotification, object: nil)
+        center.addObserver(self, selector: #selector(handleScreensSleep), name: NSWorkspace.screensDidSleepNotification, object: nil)
+    }
+
+    @objc private func handleSystemSleep() {
+        logWatchdogEvent(
+            icon: "moon.fill",
+            iconColor: "purple",
+            title: "System Sleep Triggered",
+            detail: "Received NSWorkspace.willSleepNotification. Suspending packet pipeline."
+        )
+    }
+
+    @objc private func handleScreensSleep() {
+        logWatchdogEvent(
+            icon: "display",
+            iconColor: "secondary",
+            title: "Display Sleep Event",
+            detail: "Received NSWorkspace.screensDidSleepNotification."
+        )
     }
 
     @objc private func handleSystemWake() {
+        logWatchdogEvent(
+            icon: "sun.max.fill",
+            iconColor: "orange",
+            title: "System Wake Event",
+            detail: "Received didWakeNotification. Queuing 600ms latch recovery debounce."
+        )
         sleepWakeDebounceTimer?.invalidate()
         sleepWakeDebounceTimer = Timer.scheduledTimer(withTimeInterval: 0.6, repeats: false) { [weak self] _ in
             self?.forceHardwareResync()
         }
+    }
+
+    // MARK: - Global Keyboard Hotkeys
+
+    private func setupGlobalHotkeys() {
+        globalHotKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
+            self?.handleKeyEvent(event)
+        }
+        localHotKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
+            if self?.handleKeyEvent(event) == true {
+                return nil
+            }
+            return event
+        }
+    }
+
+    @Published public var isTouchpadEnabled: Bool = true
+
+    @discardableResult
+    private func handleKeyEvent(_ event: NSEvent) -> Bool {
+        guard event.type == .keyDown else { return false }
+        let flags = event.modifierFlags
+        // Matches pure Fn held down, OR Control+Option fallback
+        let isFn = flags.contains(.function) || flags.intersection(.deviceIndependentFlagsMask).contains([.control, .option])
+        guard isFn else { return false }
+
+        switch event.keyCode {
+        case 126, 116: // Up Arrow or Page Up -> Brightness Up
+            DispatchQueue.main.async { [weak self] in self?.stepBrightnessUp() }
+            return true
+
+        case 125, 121: // Down Arrow or Page Down -> Brightness Down
+            DispatchQueue.main.async { [weak self] in self?.stepBrightnessDown() }
+            return true
+
+        case 100: // F8 -> Brightness Up
+            DispatchQueue.main.async { [weak self] in self?.stepBrightnessUp() }
+            return true
+
+        case 98: // F7 -> Brightness Down
+            DispatchQueue.main.async { [weak self] in self?.stepBrightnessDown() }
+            return true
+
+        case 124, 119: // Right Arrow or End -> Next Aura Mode
+            DispatchQueue.main.async { [weak self] in self?.cycleToNextPreset() }
+            return true
+
+        case 123, 115: // Left Arrow or Home -> Previous Aura Mode
+            DispatchQueue.main.async { [weak self] in self?.cycleToPreviousPreset() }
+            return true
+
+        case 49: // Space -> Power Toggle
+            DispatchQueue.main.async { [weak self] in self?.togglePower() }
+            return true
+
+        case 97: // F6 -> Touchpad Toggle
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.isTouchpadEnabled.toggle()
+                HUDService.shared.showTouchpadHUD(isEnabled: self.isTouchpadEnabled)
+            }
+            return true
+
+        case 122: // F1 -> Audio Mute
+            DispatchQueue.main.async {
+                let script = "set volume output muted (not (output muted of (get volume settings)))"
+                NSAppleScript(source: script)?.executeAndReturnError(nil)
+                let checkScript = "output muted of (get volume settings)"
+                let isMuted = NSAppleScript(source: checkScript)?.executeAndReturnError(nil).booleanValue ?? true
+                HUDService.shared.showVolumeHUD(percent: 0, isMuted: isMuted)
+            }
+            return true
+
+        case 120: // F2 -> Volume Down
+            DispatchQueue.main.async {
+                let script = "set volume output volume ((output volume of (get volume settings)) - 6)"
+                NSAppleScript(source: script)?.executeAndReturnError(nil)
+                let checkScript = "output volume of (get volume settings)"
+                let val = Int(NSAppleScript(source: checkScript)?.executeAndReturnError(nil).stringValue ?? "50") ?? 50
+                HUDService.shared.showVolumeHUD(percent: val, isMuted: false)
+            }
+            return true
+
+        case 99: // F3 -> Volume Up
+            DispatchQueue.main.async {
+                let script = "set volume output volume ((output volume of (get volume settings)) + 6)"
+                NSAppleScript(source: script)?.executeAndReturnError(nil)
+                let checkScript = "output volume of (get volume settings)"
+                let val = Int(NSAppleScript(source: checkScript)?.executeAndReturnError(nil).stringValue ?? "50") ?? 50
+                HUDService.shared.showVolumeHUD(percent: val, isMuted: false)
+            }
+            return true
+
+        case 118: // F4 -> Display Brightness Down
+            DispatchQueue.main.async { [weak self] in
+                self?.postBrightnessKey(down: true)
+            }
+            return true
+
+        case 96: // F5 -> Display Brightness Up
+            DispatchQueue.main.async { [weak self] in
+                self?.postBrightnessKey(down: false)
+            }
+            return true
+
+        case 101: // F9 -> Lock Screen
+            DispatchQueue.main.async {
+                let proc = Process()
+                proc.executableURL = URL(fileURLWithPath: "/System/Library/CoreServices/Menu Extras/User.menu/Contents/Resources/CGSession")
+                proc.arguments = ["-suspend"]
+                try? proc.run()
+                HUDService.shared.showMessage(icon: "lock.fill", text: "Screen Locked", color: .blue)
+            }
+            return true
+
+        case 103: // F11 -> System Sleep
+            DispatchQueue.main.async {
+                NSAppleScript(source: "tell application \"System Events\" to sleep")?.executeAndReturnError(nil)
+            }
+            return true
+
+        default:
+            return false
+        }
+    }
+
+    private func postBrightnessKey(down: Bool) {
+        let key: Int32 = down ? 3 : 2
+        let downEvent = NSEvent.otherEvent(with: .systemDefined, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, subtype: 8, data1: Int((key << 16) | (0xa << 8)), data2: -1)
+        let upEvent = NSEvent.otherEvent(with: .systemDefined, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, subtype: 8, data1: Int((key << 16) | (0xb << 8)), data2: -1)
+        downEvent?.cgEvent?.post(tap: .cghidEventTap)
+        upEvent?.cgEvent?.post(tap: .cghidEventTap)
+    }
+
+    public func stepBrightnessDown() {
+        let newLevel = max(0, currentBrightness - 1)
+        setBrightness(newLevel)
+        HUDService.shared.showBacklightHUD(level: newLevel)
+    }
+
+    public func stepBrightnessUp() {
+        let newLevel = min(3, currentBrightness + 1)
+        setBrightness(newLevel)
+        HUDService.shared.showBacklightHUD(level: newLevel)
     }
 
     // MARK: - Native Power Source (Battery Saver Auto-Dimming)
@@ -327,25 +561,20 @@ public final class AuraService: ObservableObject {
     }
 
     public func forceHardwareResync() {
-        driver.initializeKeyboard { [weak self] _ in
+        driver.initializeKeyboard { [weak self] success in
             guard let self = self else { return }
             self.reapplyCurrentLighting()
             DispatchQueue.main.async {
                 let timeStr = Date().formatted(date: .omitted, time: .standard)
                 self.lastResyncTime = timeStr
                 self.statusMessage = "● Handshake Re-Synced (\(timeStr))"
+                self.logWatchdogEvent(
+                    icon: "arrow.clockwise.circle.fill",
+                    iconColor: success ? "green" : "red",
+                    title: success ? "ITE 8910 Handshake Latched" : "Handshake Failed",
+                    detail: success ? "Handshake 'ASUS Tech.Inc.' acknowledged. Active mode restored." : "No response from USB controller."
+                )
             }
-        }
-    }
-
-    public func applyPerformanceProfile(_ profile: ROGPerformanceProfile) {
-        switch profile {
-        case .silent:
-            setBrightness(1)
-        case .balanced:
-            setBrightness(2)
-        case .turbo:
-            setBrightness(3)
         }
     }
 
@@ -383,6 +612,19 @@ public final class AuraService: ObservableObject {
     public func setLaunchAtLogin(enabled: Bool) {
         isLaunchAtLoginEnabled = enabled
         saveSettings()
+
+        if #available(macOS 13.0, *) {
+            do {
+                if enabled {
+                    try SMAppService.mainApp.register()
+                } else {
+                    try SMAppService.mainApp.unregister()
+                }
+                return
+            } catch {
+                NSLog("[ROGAuraService] SMAppService error: \(error.localizedDescription), falling back to LaunchAgent plist")
+            }
+        }
 
         let appPath = Bundle.main.bundlePath
         let plistURL = FileManager.default.homeDirectoryForCurrentUser

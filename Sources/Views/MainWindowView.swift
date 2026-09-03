@@ -15,7 +15,7 @@ public enum ROGNavTab: Int, CaseIterable, Identifiable {
     public var title: String {
         switch self {
         case .dashboard: return "Dashboard"
-        case .auraStudio: return "Aura RGB Studio"
+        case .auraStudio: return "Aura Core"
         case .powerFan: return "Power & Fans"
         case .hackintoshTools: return "Hackintosh Tools"
         case .settings: return "Settings"
@@ -90,9 +90,6 @@ public struct MainWindowView: View {
                 VStack(spacing: 0) {
                     MainHeaderBar(selectedTab: selectedTab)
 
-                    Divider()
-                        .background(Color(NSColor.separatorColor).opacity(0.3))
-
                     Group {
                         switch selectedTab {
                         case .dashboard:
@@ -132,7 +129,7 @@ struct SidebarNav: View {
                     ROGLogoView(size: 20)
 
                     VStack(alignment: .leading, spacing: 0) {
-                        Text("ROG Center")
+                        Text("ROG Gaming Center")
                             .font(.system(size: 12, weight: .bold))
                             .foregroundColor(.primary)
 
@@ -144,18 +141,11 @@ struct SidebarNav: View {
                     Spacer()
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 42) // Precise clearance under window traffic light buttons
-                .padding(.bottom, 14)
+                .padding(.top, 32) // Precise clearance under window traffic light buttons
+                .padding(.bottom, 12)
 
-                // Section Label
-                Text("FAVORITES")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(.secondary.opacity(0.7))
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 6)
-
-                // Navigation Items List (Clean Apple Finder / Settings style)
-                VStack(spacing: 2) {
+                // Navigation Items List (Clean Apple Native Style)
+                VStack(spacing: 3) {
                     ForEach(ROGNavTab.allCases) { tab in
                         SidebarNavButton(tab: tab, isSelected: (selectedTab == tab)) {
                             withAnimation(.easeInOut(duration: 0.12)) {
@@ -168,85 +158,24 @@ struct SidebarNav: View {
 
                 Spacer()
 
-                // Bottom Hardware Controller Status Card
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(service.isConnected ? Color.green : Color.orange)
-                            .frame(width: 7, height: 7)
-
-                        Text(service.isConnected ? "ITE 8910 Connected" : "Controller Standby")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(.primary)
-
-                        Spacer()
-                    }
-
-                    Text(service.statusMessage)
-                        .font(.system(size: 9))
-                        .foregroundColor(service.permissionDenied ? .orange : .secondary)
-                        .lineLimit(2)
-
-                    if service.permissionDenied {
-                        Button(action: { service.openInputMonitoringSettings() }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "lock.shield")
-                                Text("Grant Input Monitoring Access")
-                            }
-                            .font(.system(size: 10, weight: .semibold))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 4)
+                // If permission is denied by macOS, show a compact alert
+                if service.permissionDenied {
+                    Button(action: { service.openInputMonitoringSettings() }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.orange)
+                            Text("Grant Access")
+                                .font(.system(size: 10, weight: .semibold))
                         }
-                        .buttonStyle(PlainButtonStyle())
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
                         .background(Color.orange.opacity(0.18))
                         .cornerRadius(6)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(Color.orange.opacity(0.6), lineWidth: 0.5)
-                        )
                     }
-
-                    HStack(spacing: 6) {
-                        Button(action: { service.forceHardwareResync() }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "arrow.triangle.2.circlepath")
-                                Text("Re-Sync")
-                            }
-                            .font(.system(size: 10, weight: .medium))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 4)
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .background(Color(NSColor.controlColor).opacity(0.8))
-                        .cornerRadius(6)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(Color(NSColor.separatorColor).opacity(0.6), lineWidth: 0.5)
-                        )
-
-                        Button(action: { service.togglePower() }) {
-                            Image(systemName: "power")
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundColor(service.isPoweredOn ? .green : .red)
-                                .padding(5)
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .background(Color(NSColor.controlColor).opacity(0.8))
-                        .clipShape(Circle())
-                        .overlay(
-                            Circle()
-                                .stroke(Color(NSColor.separatorColor).opacity(0.6), lineWidth: 0.5)
-                        )
-                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 12)
                 }
-                .padding(10)
-                .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
-                .cornerRadius(10)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(Color(NSColor.separatorColor).opacity(0.4), lineWidth: 0.5)
-                )
-                .padding(10)
             }
         }
     }
@@ -287,60 +216,18 @@ struct SidebarNavButton: View {
 
 struct MainHeaderBar: View {
     let selectedTab: ROGNavTab
-    @ObservedObject var service = AuraService.shared
-
-    private var brightnessString: String {
-        if !service.isPoweredOn || service.currentBrightness == 0 {
-            return "Off"
-        }
-        switch service.currentBrightness {
-        case 3: return "100%"
-        case 2: return "66%"
-        case 1: return "33%"
-        default: return "\(service.currentBrightness * 33)%"
-        }
-    }
 
     var body: some View {
         HStack(alignment: .center) {
-            Text(selectedTab.title)
-                .font(.system(size: 14, weight: .semibold))
+            Text(selectedTab.title.uppercased())
+                .font(.system(size: 13, weight: .bold, design: .rounded))
                 .foregroundColor(.primary)
 
             Spacer()
-
-            // Quick Status Capsule
-            HStack(spacing: 8) {
-                HStack(spacing: 5) {
-                    Circle()
-                        .fill(service.isPoweredOn ? Color.green : Color.secondary)
-                        .frame(width: 6, height: 6)
-
-                    Text("Backlight: \(brightnessString)")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.secondary)
-                }
-
-                Divider()
-                    .frame(height: 12)
-
-                Text(service.activePresetId.capitalized.replacingOccurrences(of: "_", with: " "))
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(.primary)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
-            .cornerRadius(8)
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color(NSColor.separatorColor).opacity(0.5), lineWidth: 0.5)
-            )
         }
         .padding(.horizontal, 20)
-        .padding(.top, 38) // Align with window titlebar baseline
-        .padding(.bottom, 12)
-        .background(Color(NSColor.windowBackgroundColor).opacity(0.3))
+        .padding(.top, 14)
+        .padding(.bottom, 2)
     }
 }
 

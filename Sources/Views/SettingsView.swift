@@ -355,42 +355,36 @@ struct ROGHardwareKeyCard: View {
 struct GlobalKeyboardShortcutsCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label("Global Keyboard Shortcuts", systemImage: "command")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(.orange)
+            HStack {
+                Label("ASUS ROG Function Keys Suite (Active in Background)", systemImage: "keyboard")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.orange)
+
+                Spacer()
+
+                Text("Pure Fn Keys")
+                    .font(.system(size: 9.5, weight: .bold, design: .monospaced))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(Color.orange.opacity(0.15))
+                    .foregroundColor(.orange)
+                    .cornerRadius(4)
+            }
 
             VStack(spacing: 8) {
-                HStack(spacing: 12) {
-                    SettingsBadgeIcon(icon: "sun.max.fill", color: .yellow)
-
-                    Text("Keyboard Brightness Step Up / Down")
-                        .font(.system(size: 12, weight: .medium))
-
-                    Spacer()
-
-                    HStack(spacing: 4) {
-                        KeyCapBadge(label: "⌃")
-                        KeyCapBadge(label: "⌥")
-                        KeyCapBadge(label: "F7 / F8")
-                    }
-                }
-
+                ShortcutRow(icon: "sun.max.fill", color: .yellow, title: "Keyboard Backlight Up / Down", keys: ["Fn", "↑ / ↓", "or", "F7 / F8"])
                 Divider().opacity(0.4)
-
-                HStack(spacing: 12) {
-                    SettingsBadgeIcon(icon: "power", color: .pink)
-
-                    Text("Toggle Keyboard Backlight Power")
-                        .font(.system(size: 12, weight: .medium))
-
-                    Spacer()
-
-                    HStack(spacing: 4) {
-                        KeyCapBadge(label: "⌃")
-                        KeyCapBadge(label: "⌥")
-                        KeyCapBadge(label: "Space")
-                    }
-                }
+                ShortcutRow(icon: "sparkles", color: .purple, title: "Cycle Aura RGB Modes (Rainbow, etc.)", keys: ["Fn", "← / →"])
+                Divider().opacity(0.4)
+                ShortcutRow(icon: "power", color: .pink, title: "Toggle Backlight Power (Instant On / Off)", keys: ["Fn", "Space"])
+                Divider().opacity(0.4)
+                ShortcutRow(icon: "speaker.wave.2.fill", color: .blue, title: "Audio Mute / Volume Down / Volume Up", keys: ["Fn", "F1", "F2", "F3"])
+                Divider().opacity(0.4)
+                ShortcutRow(icon: "display", color: .cyan, title: "Screen Display Brightness Down / Up", keys: ["Fn", "F4 / F5"])
+                Divider().opacity(0.4)
+                ShortcutRow(icon: "rectangle.split.2x1.fill", color: .indigo, title: "Touchpad Toggle (On / Off)", keys: ["Fn", "F6"])
+                Divider().opacity(0.4)
+                ShortcutRow(icon: "lock.fill", color: .green, title: "Screen Lock / System Sleep", keys: ["Fn", "F9 / F11"])
             }
         }
         .padding(14)
@@ -400,6 +394,36 @@ struct GlobalKeyboardShortcutsCard: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color(NSColor.separatorColor).opacity(0.5), lineWidth: 0.5)
         )
+    }
+}
+
+struct ShortcutRow: View {
+    let icon: String
+    let color: Color
+    let title: String
+    let keys: [String]
+
+    var body: some View {
+        HStack(spacing: 12) {
+            SettingsBadgeIcon(icon: icon, color: color)
+
+            Text(title)
+                .font(.system(size: 11.5, weight: .medium))
+
+            Spacer()
+
+            HStack(spacing: 4) {
+                ForEach(keys, id: \.self) { k in
+                    if k == "or" {
+                        Text("or")
+                            .font(.system(size: 9))
+                            .foregroundColor(.secondary)
+                    } else {
+                        KeyCapBadge(label: k)
+                    }
+                }
+            }
+        }
     }
 }
 
