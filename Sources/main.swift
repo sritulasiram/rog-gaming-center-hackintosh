@@ -66,7 +66,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         window.title = "ROG Gaming Center"
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
-        window.isMovableByWindowBackground = false
+        window.isMovableByWindowBackground = true
         window.minSize = NSSize(width: 900, height: 600)
         window.contentViewController = NSHostingController(rootView: MainWindowView())
         window.delegate = self

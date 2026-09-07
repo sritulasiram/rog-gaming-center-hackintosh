@@ -433,19 +433,15 @@ struct QuickHardwareDock: View {
                 HStack(spacing: 4) {
                     DockMiniButton(title: "0", isSelected: !service.isPoweredOn || service.currentBrightness == 0) {
                         service.setBrightness(0)
-                        HUDService.shared.showBacklightHUD(level: 0)
                     }
                     DockMiniButton(title: "33", isSelected: service.isPoweredOn && service.currentBrightness == 1) {
                         service.setBrightness(1)
-                        HUDService.shared.showBacklightHUD(level: 1)
                     }
                     DockMiniButton(title: "66", isSelected: service.isPoweredOn && service.currentBrightness == 2) {
                         service.setBrightness(2)
-                        HUDService.shared.showBacklightHUD(level: 2)
                     }
                     DockMiniButton(title: "100", isSelected: service.isPoweredOn && service.currentBrightness == 3) {
                         service.setBrightness(3)
-                        HUDService.shared.showBacklightHUD(level: 3)
                     }
                 }
             }
@@ -480,7 +476,6 @@ struct QuickHardwareDock: View {
                     ForEach(ROGDisplayProfile.allCases) { profile in
                         Button(action: {
                             telemetry.setDisplayProfile(profile)
-                            HUDService.shared.showMessage(icon: "eye.fill", text: profile.title, color: .blue)
                         }) {
                             Text(profileShortName(profile))
                                 .font(.system(size: 9.5, weight: telemetry.activeDisplayProfile == profile ? .bold : .regular))
@@ -512,6 +507,8 @@ struct QuickHardwareDock: View {
         case .vividGaming: return "Vivid"
         case .eyeCare: return "Eye"
         case .cinema: return "Film"
+        case .fps: return "FPS"
+        case .rts: return "RTS"
         }
     }
 }

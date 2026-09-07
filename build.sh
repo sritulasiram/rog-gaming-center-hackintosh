@@ -22,14 +22,13 @@ swiftc -O -framework IOKit -framework Cocoa -framework SwiftUI -framework Founda
     ./Sources/AuraDriver.swift \
     ./Sources/SMCReader.swift \
     ./Sources/DisplayCalibrationService.swift \
-    ./Sources/HUDService.swift \
     ./Sources/TelemetryService.swift \
     ./Sources/AuraService.swift \
     ./Sources/Views/ROGLogoView.swift \
+    ./Sources/Views/ROGDesignSystem.swift \
     ./Sources/Views/DashboardView.swift \
     ./Sources/Views/AuraStudioView.swift \
-    ./Sources/Views/PowerFanView.swift \
-    ./Sources/Views/HackintoshToolsView.swift \
+    ./Sources/Views/GameVisualView.swift \
     ./Sources/Views/SettingsView.swift \
     ./Sources/Views/MainWindowView.swift \
     ./Sources/AuraPopoverView.swift \

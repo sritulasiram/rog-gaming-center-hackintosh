@@ -180,7 +180,6 @@ public struct AuraPopoverView: View {
                             ) {
                                 withAnimation(.easeInOut(duration: 0.15)) {
                                     telemetry.setDisplayProfile(profile)
-                                    HUDService.shared.showMessage(icon: "eye.fill", text: profile.title, color: .blue)
                                 }
                             }
                         }
@@ -306,6 +305,8 @@ struct PopoverDisplayProfileButton: View {
         case .vividGaming: return "Vivid"
         case .eyeCare: return "Eye"
         case .cinema: return "Film"
+        case .fps: return "FPS"
+        case .rts: return "RTS"
         }
     }
 }

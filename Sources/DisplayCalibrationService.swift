@@ -53,6 +53,14 @@ public final class DisplayCalibrationService {
         _ = CGSetDisplayTransferByTable(display, tableCapacity, &r, &g, &b)
     }
 
+    public var targetDisplayID: CGDirectDisplayID {
+        CGMainDisplayID()
+    }
+
+    public var currentTableCapacity: UInt32 {
+        tableCapacity
+    }
+
     /// Applies a GameVisual display calibration profile
     public func applyProfile(_ profile: ROGDisplayProfile) {
         if !isBaselineSaved || tableCapacity == 0 {
@@ -109,6 +117,30 @@ public final class DisplayCalibrationService {
                 newR[i] = CGGammaValue(min(1.0, max(0.0, Double(baselineRed[i]) * 0.98 + lift)))
                 newG[i] = CGGammaValue(min(1.0, max(0.0, Double(baselineGreen[i]) * 0.98 + lift)))
                 newB[i] = CGGammaValue(min(1.0, max(0.0, Double(baselineBlue[i]) * 0.99 + lift)))
+            }
+
+        case .fps:
+            // FPS Mode: Shadow clarity booster so targets hidden in dark environments are clearly visible
+            for i in 0..<n {
+                let x = Double(i) / Double(n - 1)
+                let shadowBoost = max(0.0, (0.55 - x) * 0.14)
+                newR[i] = CGGammaValue(min(1.0, max(0.0, Double(baselineRed[i]) + shadowBoost)))
+                newG[i] = CGGammaValue(min(1.0, max(0.0, Double(baselineGreen[i]) + shadowBoost)))
+                newB[i] = CGGammaValue(min(1.0, max(0.0, Double(baselineBlue[i]) + shadowBoost * 0.9)))
+            }
+
+        case .rts:
+            // RTS / RPG Mode: Boosted color saturation & terrain contrast
+            for i in 0..<n {
+                let x = Double(i) / Double(n - 1)
+                let factor = pow(x, 0.88)
+                let rNorm = Double(baselineRed[i])
+                let gNorm = Double(baselineGreen[i])
+                let bNorm = Double(baselineBlue[i])
+
+                newR[i] = CGGammaValue(min(1.0, max(0.0, rNorm * 1.08 * (factor / max(0.001, x)))))
+                newG[i] = CGGammaValue(min(1.0, max(0.0, gNorm * 1.06 * (factor / max(0.001, x)))))
+                newB[i] = CGGammaValue(min(1.0, max(0.0, bNorm * 1.02 * (factor / max(0.001, x)))))
             }
         }
 
