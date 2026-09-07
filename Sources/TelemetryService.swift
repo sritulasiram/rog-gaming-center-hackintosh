@@ -10,6 +10,8 @@ public enum ROGDisplayProfile: String, CaseIterable, Codable, Identifiable {
     case vividGaming = "vivid_gaming"
     case eyeCare = "eye_care"
     case cinema = "cinema"
+    case fps = "fps"
+    case rts = "rts"
 
     public var id: String { rawValue }
 
@@ -19,6 +21,8 @@ public enum ROGDisplayProfile: String, CaseIterable, Codable, Identifiable {
         case .vividGaming: return "Vivid Gaming"
         case .eyeCare: return "Eye Care (Warm)"
         case .cinema: return "Cinema Rich"
+        case .fps: return "FPS Mode"
+        case .rts: return "RTS / RPG"
         }
     }
 
@@ -28,6 +32,8 @@ public enum ROGDisplayProfile: String, CaseIterable, Codable, Identifiable {
         case .vividGaming: return "gamecontroller.fill"
         case .eyeCare: return "eye.fill"
         case .cinema: return "film.fill"
+        case .fps: return "scope"
+        case .rts: return "shield.fill"
         }
     }
 }
@@ -154,11 +160,13 @@ public final class TelemetryService: ObservableObject {
             let newMem = self.fetchMemory()
             let newBat = self.fetchBattery()
             let newUptime = self.fetchUptime()
+            let newFan = self.fetchFanTelemetry(cpuPercent: newCpu.totalUsagePercent)
 
             DispatchQueue.main.async {
                 self.cpuLoad = newCpu
                 self.memory = newMem
                 self.battery = newBat
+                self.fan = newFan
                 self.specs.uptimeString = newUptime
                 
                 // Update rolling CPU sparkline history
@@ -166,9 +174,6 @@ public final class TelemetryService: ObservableObject {
                 if self.cpuHistory.count > 24 {
                     self.cpuHistory.removeFirst()
                 }
-
-                // Update fan telemetry
-                self.updateFanTelemetry(cpuPercent: newCpu.totalUsagePercent)
             }
         }
     }
@@ -378,61 +383,57 @@ public final class TelemetryService: ObservableObject {
 
     // MARK: - Fan & Thermal Control Handlers
 
-    private func updateFanTelemetry(cpuPercent: Double) {
-        // Query live hardware sensors from AppleSMC / VirtualSMC
+    private func fetchFanTelemetry(cpuPercent: Double) -> FanTelemetryData {
+        var fanData = self.fan
+        // Query live hardware sensors from AppleSMC / VirtualSMC on background thread
         let smc = SMCReader.shared
         let realCpuTemp = smc.readCPUTemperature()
         let realCpuFan = smc.readFanRPM(index: 0)
         let realMaxFan = smc.readMaxFanRPM(index: 0)
 
         if let maxR = realMaxFan, maxR > 1000 {
-            self.fan.maxFanRPM = Int(maxR)
+            fanData.maxFanRPM = Int(maxR)
         }
 
         let temp: Int
         if let realT = realCpuTemp {
             temp = Int(realT.rounded())
-            self.fan.isRealHardwareThermals = true
+            fanData.isRealHardwareThermals = true
         } else {
             temp = 42 + Int(cpuPercent * 0.45)
-            self.fan.isRealHardwareThermals = false
+            fanData.isRealHardwareThermals = false
         }
 
         // Check if SMC exposes live hardware fan tachometers
         if let rCpuFan = realCpuFan, rCpuFan > 0 {
-            self.fan.isRealFanRPM = true
-            self.fan.fanRPM = Int(rCpuFan)
+            fanData.isRealFanRPM = true
+            fanData.fanRPM = Int(rCpuFan)
         } else {
             // Physical EC thermal response curve
-            self.fan.isRealFanRPM = false
+            fanData.isRealFanRPM = false
             var baseRpm = 2200
             if temp < 52 {
                 baseRpm = 1800
             } else if temp < 75 {
                 baseRpm = 2200 + Int(Double(temp - 52) * 20.0)
             } else {
-                baseRpm = min(self.fan.maxFanRPM, 2700 + Int(Double(temp - 75) * 30.0))
+                baseRpm = min(fanData.maxFanRPM, 2700 + Int(Double(temp - 75) * 30.0))
             }
             let jitter = Int.random(in: -15...15)
-            self.fan.fanRPM = max(1400, min(self.fan.maxFanRPM, baseRpm + jitter))
+            fanData.fanRPM = max(1400, min(fanData.maxFanRPM, baseRpm + jitter))
         }
 
-        self.fan.cpuTempCelsius = temp
+        fanData.cpuTempCelsius = temp
+        fanData.thermalHeadroomPercent = max(0, min(100, 100 - temp))
 
-        // Calculate real thermal headroom until 100°C Tjunction threshold
-        let headroom = max(0, min(100, 100 - temp))
-        self.fan.thermalHeadroomPercent = headroom
-
-        // Determine autonomous hardware cooling phase
-        let phase: String
         if temp < 52 {
-            phase = "Quiet Airflow"
+            fanData.coolingPhaseTitle = "Quiet Airflow"
         } else if temp < 75 {
-            phase = "Active Cooling"
+            fanData.coolingPhaseTitle = "Active Cooling"
         } else {
-            phase = "Thermal Turbo"
+            fanData.coolingPhaseTitle = "Thermal Turbo"
         }
-        self.fan.coolingPhaseTitle = phase
+        return fanData
     }
 
     // MARK: - Display Calibration Profile Handlers

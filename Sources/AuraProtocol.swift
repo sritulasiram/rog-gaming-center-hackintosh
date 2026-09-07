@@ -428,17 +428,16 @@ public enum AuraPacketBuilder {
             packets.append(pkt)
 
         case .rainbow(let speed):
+            // Hardware Rainbow Wave on ITE 8910 is Mode 0x03
             var allPkt = [UInt8](repeating: 0, count: MESSAGE_LENGTH)
-            allPkt[0] = 0x5d; allPkt[1] = 0xb3; allPkt[2] = 0x00; allPkt[3] = 0x02
+            allPkt[0] = 0x5d; allPkt[1] = 0xb3; allPkt[2] = 0x00; allPkt[3] = 0x03
             allPkt[4] = 0xff; allPkt[7] = speed.byteValue
             packets.append(allPkt)
 
-            let rainbowColors: [RGBColor] = [.red, .yellow, .cyan, .magenta]
             for i in 0..<4 {
-                let sc = scaled(rainbowColors[i])
                 var pkt = [UInt8](repeating: 0, count: MESSAGE_LENGTH)
-                pkt[0] = 0x5d; pkt[1] = 0xb3; pkt[2] = UInt8(i + 1); pkt[3] = 0x00
-                pkt[4] = sc.red; pkt[5] = sc.green; pkt[6] = sc.blue; pkt[7] = speed.byteValue
+                pkt[0] = 0x5d; pkt[1] = 0xb3; pkt[2] = UInt8(i + 1); pkt[3] = 0x03
+                pkt[4] = 0xff; pkt[7] = speed.byteValue
                 packets.append(pkt)
             }
 

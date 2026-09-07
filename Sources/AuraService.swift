@@ -1,6 +1,5 @@
 import Foundation
 import Cocoa
-import IOKit.ps
 import ServiceManagement
 
 public enum ROGKeyAction: String, CaseIterable, Identifiable, Codable {
@@ -14,7 +13,7 @@ public enum ROGKeyAction: String, CaseIterable, Identifiable, Codable {
     public var displayName: String {
         switch self {
         case .toggleMainWindow: return "Toggle Main Window (Show / Hide)"
-        case .togglePopover: return "Toggle Menu Bar HUD Popover"
+        case .togglePopover: return "Toggle Menu Bar Popover"
         case .cyclePresets: return "Cycle Aura RGB Presets"
         case .toggleBacklightPower: return "Toggle Backlight (On / Off)"
         }
@@ -65,7 +64,6 @@ public final class AuraService: ObservableObject {
         RGBColor(red: 0, green: 127, blue: 255)    // Numpad
     ]
     @Published public var customPresets: [AuraPreset] = []
-    @Published public var isBatterySaverEnabled: Bool = true
     @Published public var isLaunchAtLoginEnabled: Bool = false
     @Published public var isCloseToTrayEnabled: Bool = true
     @Published public var isROGKeyEnabled: Bool = true
@@ -84,8 +82,12 @@ public final class AuraService: ObservableObject {
 
     public var onROGKeyActionTriggered: ((ROGKeyAction) -> Void)?
 
-    private var powerSourceRunLoopSource: CFRunLoopSource?
     private var sleepWakeDebounceTimer: Timer?
+    private var multiStrobeTimer: Timer?
+    private var multiStrobeIndex: Int = 0
+    private static let multiStrobePalette: [RGBColor] = [
+        .rogRed, .orange, .yellow, .green, .cyan, .blue, .purple, .white
+    ]
     private var globalHotKeyMonitor: Any?
     private var localHotKeyMonitor: Any?
 
@@ -93,7 +95,6 @@ public final class AuraService: ObservableObject {
         loadSettings()
         setupDriverObservers()
         setupSystemWakeObservers()
-        setupPowerSourceMonitoring()
         setupGlobalHotkeys()
 
         logWatchdogEvent(
@@ -197,10 +198,8 @@ public final class AuraService: ObservableObject {
         if let idx = all.firstIndex(where: { $0.id == activePresetId }) {
             let nextIdx = (idx + 1) % all.count
             applyPreset(all[nextIdx])
-            HUDService.shared.showAuraModeHUD(modeName: all[nextIdx].name)
         } else {
             applyPreset(all[0])
-            HUDService.shared.showAuraModeHUD(modeName: all[0].name)
         }
     }
 
@@ -210,10 +209,8 @@ public final class AuraService: ObservableObject {
         if let idx = all.firstIndex(where: { $0.id == activePresetId }) {
             let prevIdx = (idx - 1 + all.count) % all.count
             applyPreset(all[prevIdx])
-            HUDService.shared.showAuraModeHUD(modeName: all[prevIdx].name)
         } else {
             applyPreset(all[0])
-            HUDService.shared.showAuraModeHUD(modeName: all[0].name)
         }
     }
 
@@ -324,7 +321,6 @@ public final class AuraService: ObservableObject {
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
                 self.isTouchpadEnabled.toggle()
-                HUDService.shared.showTouchpadHUD(isEnabled: self.isTouchpadEnabled)
             }
             return true
 
@@ -332,9 +328,6 @@ public final class AuraService: ObservableObject {
             DispatchQueue.main.async {
                 let script = "set volume output muted (not (output muted of (get volume settings)))"
                 NSAppleScript(source: script)?.executeAndReturnError(nil)
-                let checkScript = "output muted of (get volume settings)"
-                let isMuted = NSAppleScript(source: checkScript)?.executeAndReturnError(nil).booleanValue ?? true
-                HUDService.shared.showVolumeHUD(percent: 0, isMuted: isMuted)
             }
             return true
 
@@ -342,9 +335,6 @@ public final class AuraService: ObservableObject {
             DispatchQueue.main.async {
                 let script = "set volume output volume ((output volume of (get volume settings)) - 6)"
                 NSAppleScript(source: script)?.executeAndReturnError(nil)
-                let checkScript = "output volume of (get volume settings)"
-                let val = Int(NSAppleScript(source: checkScript)?.executeAndReturnError(nil).stringValue ?? "50") ?? 50
-                HUDService.shared.showVolumeHUD(percent: val, isMuted: false)
             }
             return true
 
@@ -352,9 +342,6 @@ public final class AuraService: ObservableObject {
             DispatchQueue.main.async {
                 let script = "set volume output volume ((output volume of (get volume settings)) + 6)"
                 NSAppleScript(source: script)?.executeAndReturnError(nil)
-                let checkScript = "output volume of (get volume settings)"
-                let val = Int(NSAppleScript(source: checkScript)?.executeAndReturnError(nil).stringValue ?? "50") ?? 50
-                HUDService.shared.showVolumeHUD(percent: val, isMuted: false)
             }
             return true
 
@@ -376,7 +363,6 @@ public final class AuraService: ObservableObject {
                 proc.executableURL = URL(fileURLWithPath: "/System/Library/CoreServices/Menu Extras/User.menu/Contents/Resources/CGSession")
                 proc.arguments = ["-suspend"]
                 try? proc.run()
-                HUDService.shared.showMessage(icon: "lock.fill", text: "Screen Locked", color: .blue)
             }
             return true
 
@@ -402,62 +388,11 @@ public final class AuraService: ObservableObject {
     public func stepBrightnessDown() {
         let newLevel = max(0, currentBrightness - 1)
         setBrightness(newLevel)
-        HUDService.shared.showBacklightHUD(level: newLevel)
     }
 
     public func stepBrightnessUp() {
         let newLevel = min(3, currentBrightness + 1)
         setBrightness(newLevel)
-        HUDService.shared.showBacklightHUD(level: newLevel)
-    }
-
-    // MARK: - Native Power Source (Battery Saver Auto-Dimming)
-
-    private func setupPowerSourceMonitoring() {
-        let context = UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
-        powerSourceRunLoopSource = IOPSNotificationCreateRunLoopSource({ context in
-            guard let context = context else { return }
-            let service = Unmanaged<AuraService>.fromOpaque(context).takeUnretainedValue()
-            service.checkPowerSourceState()
-        }, context)?.takeRetainedValue()
-
-        if let source = powerSourceRunLoopSource {
-            CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .defaultMode)
-        }
-        checkPowerSourceState()
-    }
-
-    private func checkPowerSourceState() {
-        guard isBatterySaverEnabled else { return }
-
-        guard let snapshot = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
-              let sources = IOPSCopyPowerSourcesList(snapshot)?.takeRetainedValue() else {
-            return
-        }
-
-        let count = CFArrayGetCount(sources)
-        var isRunningOnBattery = false
-
-        for i in 0..<count {
-            guard let source = CFArrayGetValueAtIndex(sources, i) else { continue }
-            let sourceRef = unsafeBitCast(source, to: CFTypeRef.self)
-            guard let desc = IOPSGetPowerSourceDescription(snapshot, sourceRef)?.takeUnretainedValue() as NSDictionary? else { continue }
-
-            if let state = desc[kIOPSPowerSourceStateKey as String] as? String, state == kIOPSBatteryPowerValue {
-                isRunningOnBattery = true
-                break
-            }
-        }
-
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            if isRunningOnBattery && self.currentBrightness > 1 {
-                self.savedACBrightness = self.currentBrightness
-                self.setBrightness(1) // Auto-dim to 33% on battery
-            } else if !isRunningOnBattery && self.currentBrightness == 1 && self.savedACBrightness > 1 {
-                self.setBrightness(self.savedACBrightness) // Restore AC level
-            }
-        }
     }
 
     // MARK: - Public Lighting Controls
@@ -473,6 +408,7 @@ public final class AuraService: ObservableObject {
     public func togglePower() {
         isPoweredOn.toggle()
         if !isPoweredOn {
+            stopMultiStrobeTimer()
             driver.turnOff()
         } else {
             if currentBrightness == 0 { currentBrightness = 3 }
@@ -485,6 +421,7 @@ public final class AuraService: ObservableObject {
         let clamped = max(0, min(3, level))
         currentBrightness = clamped
         if clamped == 0 {
+            stopMultiStrobeTimer()
             isPoweredOn = false
             driver.turnOff()
         } else {
@@ -518,6 +455,7 @@ public final class AuraService: ObservableObject {
     }
 
     public func applyPreset(_ preset: AuraPreset) {
+        stopMultiStrobeTimer()
         activePresetId = preset.id
         isPoweredOn = true
         if currentBrightness == 0 { currentBrightness = 3 }
@@ -540,6 +478,7 @@ public final class AuraService: ObservableObject {
     }
 
     public func applySingleColor(_ color: RGBColor) {
+        stopMultiStrobeTimer()
         activePresetId = "custom_single"
         isPoweredOn = true
         if currentBrightness == 0 { currentBrightness = 3 }
@@ -547,6 +486,84 @@ public final class AuraService: ObservableObject {
         zoneColors = [color, color, color, color]
         reapplyCurrentLighting()
         saveSettings()
+    }
+
+    public func applyRainbow(speed: AuraSpeed = .medium) {
+        stopMultiStrobeTimer()
+        activePresetId = "rainbow"
+        isPoweredOn = true
+        if currentBrightness == 0 { currentBrightness = 3 }
+        currentSpeed = speed
+        currentMode = .rainbow(speed)
+        reapplyCurrentLighting()
+        saveSettings()
+    }
+
+    public func applyColorCycle(speed: AuraSpeed = .medium) {
+        stopMultiStrobeTimer()
+        activePresetId = "color_cycle"
+        isPoweredOn = true
+        if currentBrightness == 0 { currentBrightness = 3 }
+        currentSpeed = speed
+        currentMode = .colorCycle(speed)
+        reapplyCurrentLighting()
+        saveSettings()
+    }
+
+    public func applyBreathing(c1: RGBColor, c2: RGBColor? = nil, speed: AuraSpeed = .medium) {
+        stopMultiStrobeTimer()
+        activePresetId = "custom_breathing"
+        isPoweredOn = true
+        if currentBrightness == 0 { currentBrightness = 3 }
+        currentSpeed = speed
+        if let c2 = c2 {
+            currentMode = .singleBreathing(c1, c2, speed)
+        } else {
+            currentMode = .singleBreathing(c1, .black, speed)
+        }
+        reapplyCurrentLighting()
+        saveSettings()
+    }
+
+    public func applyStrobing(color: RGBColor, speed: AuraSpeed = .medium) {
+        stopMultiStrobeTimer()
+        activePresetId = "custom_strobing"
+        isPoweredOn = true
+        if currentBrightness == 0 { currentBrightness = 3 }
+        currentSpeed = speed
+        currentMode = .strobing(color, speed)
+        reapplyCurrentLighting()
+        saveSettings()
+    }
+
+    public func applyMultiStrobing(speed: AuraSpeed = .medium) {
+        stopMultiStrobeTimer()
+        activePresetId = "multi_strobing"
+        isPoweredOn = true
+        if currentBrightness == 0 { currentBrightness = 3 }
+        currentSpeed = speed
+        multiStrobeIndex = 0
+        let initialColor = Self.multiStrobePalette[0]
+        currentMode = .strobing(initialColor, speed)
+        reapplyCurrentLighting()
+        saveSettings()
+
+        let interval: TimeInterval = speed == .fast ? 0.35 : (speed == .medium ? 0.6 : 0.9)
+        multiStrobeTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] timer in
+            guard let self = self, self.isPoweredOn, self.activePresetId == "multi_strobing" else {
+                timer.invalidate()
+                return
+            }
+            self.multiStrobeIndex = (self.multiStrobeIndex + 1) % Self.multiStrobePalette.count
+            let c = Self.multiStrobePalette[self.multiStrobeIndex]
+            self.currentMode = .strobing(c, self.currentSpeed)
+            self.driver.applyMode(self.currentMode, brightness: self.currentBrightness)
+        }
+    }
+
+    public func stopMultiStrobeTimer() {
+        multiStrobeTimer?.invalidate()
+        multiStrobeTimer = nil
     }
 
     public func setZoneColor(zoneIndex: Int, color: RGBColor) {
@@ -662,10 +679,8 @@ public final class AuraService: ObservableObject {
 
     public func saveSettings() {
         defaults.set(currentBrightness, forKey: "Aura_Brightness")
-        defaults.set(savedACBrightness, forKey: "Aura_SavedACBrightness")
         defaults.set(currentSpeed.rawValue, forKey: "Aura_Speed")
         defaults.set(activePresetId, forKey: "Aura_ActivePresetId")
-        defaults.set(isBatterySaverEnabled, forKey: "Aura_BatterySaver")
         defaults.set(isLaunchAtLoginEnabled, forKey: "Aura_LaunchAtLogin")
         defaults.set(isCloseToTrayEnabled, forKey: "Aura_CloseToTray")
         defaults.set(isROGKeyEnabled, forKey: "Aura_ROGKeyEnabled")
@@ -686,17 +701,11 @@ public final class AuraService: ObservableObject {
         if defaults.object(forKey: "Aura_Brightness") != nil {
             currentBrightness = defaults.integer(forKey: "Aura_Brightness")
         }
-        if defaults.object(forKey: "Aura_SavedACBrightness") != nil {
-            savedACBrightness = defaults.integer(forKey: "Aura_SavedACBrightness")
-        }
         if let spVal = defaults.object(forKey: "Aura_Speed") as? Int, let sp = AuraSpeed(rawValue: spVal) {
             currentSpeed = sp
         }
         if let presetId = defaults.string(forKey: "Aura_ActivePresetId") {
             activePresetId = presetId
-        }
-        if defaults.object(forKey: "Aura_BatterySaver") != nil {
-            isBatterySaverEnabled = defaults.bool(forKey: "Aura_BatterySaver")
         }
         if defaults.object(forKey: "Aura_LaunchAtLogin") != nil {
             isLaunchAtLoginEnabled = defaults.bool(forKey: "Aura_LaunchAtLogin")

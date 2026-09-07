@@ -13,87 +13,239 @@ extension Color {
     }
 }
 
-public enum AuraCoreSubTab: String, CaseIterable, Identifiable {
-    case basicEffects = "BASIC EFFECTS"
-    case custom4Zone = "4-ZONE CUSTOM"
+// MARK: - Effect Mode Types
 
+public enum AuraEffectCategory: String, CaseIterable, Identifiable {
+    case staticMode = "Static"
+    case breathing = "Breathing"
+    case colorCycle = "Color Cycle"
+    case rainbow = "Rainbow"
+    case strobing = "Strobing"
+
+    public var id: String { rawValue }
+
+    public var icon: String {
+        switch self {
+        case .staticMode: return "lightbulb.fill"
+        case .breathing: return "water.waves"
+        case .colorCycle: return "sparkles"
+        case .rainbow: return "rainbow"
+        case .strobing: return "bolt.fill"
+        }
+    }
+
+    public var subtitle: String {
+        switch self {
+        case .staticMode: return "Solid or curated themes"
+        case .breathing: return "Rhythmic fading pulse"
+        case .colorCycle: return "Synchronized spectrum"
+        case .rainbow: return "Rolling multi-color wave"
+        case .strobing: return "High-energy RGB pulse"
+        }
+    }
+}
+
+public enum StaticSubMode: String, CaseIterable, Identifiable {
+    case solid = "Solid Color"
+    case themes = "Curated Themes"
     public var id: String { rawValue }
 }
 
+public enum BreathingSubMode: String, CaseIterable, Identifiable {
+    case single = "Single Color"
+    case dual = "Dual Color"
+    case multi = "Multi-Color"
+    public var id: String { rawValue }
+}
+
+public enum StrobingSubMode: String, CaseIterable, Identifiable {
+    case custom = "Custom Color"
+    case multiRainbow = "Multi-Color Rainbow"
+    public var id: String { rawValue }
+}
+
+// MARK: - Main Aura Core View
+
 public struct AuraStudioView: View {
     @ObservedObject var service = AuraService.shared
-    @State private var selectedSubTab: AuraCoreSubTab = .basicEffects
-    @State private var hexInputText: String = ""
+
+    @State private var selectedEffect: AuraEffectCategory = .staticMode
+    @State private var staticSubMode: StaticSubMode = .solid
+    @State private var breathingSubMode: BreathingSubMode = .single
+    @State private var strobingSubMode: StrobingSubMode = .custom
+
+    @State private var selectedColor: RGBColor = .rogRed
+    @State private var breathingColor2: RGBColor = .blue
+    @State private var hexInputText: String = "E02933"
     @State private var showAppliedBanner: Bool = false
 
     public init() {}
 
-    var activeColor: RGBColor {
-        service.zoneColors[service.activeEditingZoneIndex]
+    public var body: some View {
+        ScrollView(.vertical, showsIndicators: true) {
+            VStack(spacing: 16) {
+                // 1. Studio Header & Hardware Status
+                AuraStudioHeader(
+                    showAppliedBanner: showAppliedBanner,
+                    onPowerToggle: { service.togglePower() }
+                )
+
+                // 2. Seamless Full-Width Keyboard Deck (No artificial zone dividers)
+                AuraSeamlessKeyboardDeck(
+                    selectedEffect: selectedEffect,
+                    activeColor: selectedColor,
+                    breathingColor2: breathingColor2
+                )
+
+                // 3. Lighting Effect Cards Gallery (5 Authentic Modes)
+                AuraEffectsGallery(selectedEffect: $selectedEffect) { effect in
+                    handleEffectSelected(effect)
+                }
+
+                // 4. Contextual Controls & Sub-Options Deck
+                AuraContextualControlsDeck(
+                    selectedEffect: selectedEffect,
+                    staticSubMode: $staticSubMode,
+                    breathingSubMode: $breathingSubMode,
+                    strobingSubMode: $strobingSubMode,
+                    selectedColor: $selectedColor,
+                    breathingColor2: $breathingColor2,
+                    hexInputText: $hexInputText,
+                    onColorChanged: { col in
+                        handleColorChanged(col)
+                    },
+                    onThemeSelected: { preset in
+                        service.applyPreset(preset)
+                    },
+                    onBreathingModeChanged: { mode in
+                        handleBreathingModeChanged(mode)
+                    },
+                    onStrobingModeChanged: { mode in
+                        handleStrobingModeChanged(mode)
+                    },
+                    onApply: { triggerApply() }
+                )
+            }
+            .padding(18)
+        }
+        .onAppear {
+            syncStateFromService()
+        }
+        .onChange(of: service.activePresetId) { _ in
+            syncStateFromService()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSColorPanel.colorDidChangeNotification)) { notif in
+            guard let panel = notif.object as? NSColorPanel,
+                  let srgbColor = panel.color.usingColorSpace(.sRGB) else { return }
+            let r = UInt8(max(0, min(255, srgbColor.redComponent * 255)))
+            let g = UInt8(max(0, min(255, srgbColor.greenComponent * 255)))
+            let b = UInt8(max(0, min(255, srgbColor.blueComponent * 255)))
+            let picked = RGBColor(red: r, green: g, blue: b)
+            handleColorChanged(picked)
+        }
     }
 
-    public var body: some View {
-        VStack(spacing: 12) {
-            // Top Sub-Navigation Bar
-            HStack(spacing: 16) {
-                ForEach(AuraCoreSubTab.allCases) { tab in
-                    Button(action: {
-                        withAnimation(.easeInOut(duration: 0.15)) {
-                            selectedSubTab = tab
-                        }
-                    }) {
-                        VStack(spacing: 4) {
-                            Text(tab.rawValue)
-                                .font(.system(size: 11, weight: selectedSubTab == tab ? .bold : .medium, design: .rounded))
-                                .foregroundColor(selectedSubTab == tab ? .red : .secondary)
+    private func syncStateFromService() {
+        switch service.currentMode {
+        case .singleStatic(let c):
+            selectedEffect = .staticMode
+            staticSubMode = .solid
+            selectedColor = c
+            hexInputText = c.upperHexString
+        case .multiStatic:
+            selectedEffect = .staticMode
+            staticSubMode = .themes
+            if let c = service.zoneColors.first {
+                selectedColor = c
+                hexInputText = c.upperHexString
+            }
+        case .singleBreathing(let c1, let c2, _):
+            selectedEffect = .breathing
+            selectedColor = c1
+            breathingColor2 = c2
+            hexInputText = c1.upperHexString
+            breathingSubMode = (c2 == .black || c2 == c1) ? .single : .dual
+        case .multiBreathing:
+            selectedEffect = .breathing
+            breathingSubMode = .multi
+        case .colorCycle:
+            selectedEffect = .colorCycle
+        case .rainbow:
+            selectedEffect = .rainbow
+        case .strobing(let c, _):
+            selectedEffect = .strobing
+            if service.activePresetId == "multi_strobing" {
+                strobingSubMode = .multiRainbow
+            } else {
+                strobingSubMode = .custom
+                selectedColor = c
+                hexInputText = c.upperHexString
+            }
+        case .off:
+            break
+        }
+    }
 
-                            Rectangle()
-                                .fill(selectedSubTab == tab ? Color.red : Color.clear)
-                                .frame(height: 2)
-                        }
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                }
-
-                Spacer()
-
-                if showAppliedBanner {
-                    HStack(spacing: 4) {
-                        Image(systemName: "checkmark.circle.fill")
-                        Text("Applied to Hardware")
-                    }
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(.green)
-                    .transition(.opacity)
+    private func handleEffectSelected(_ effect: AuraEffectCategory) {
+        selectedEffect = effect
+        switch effect {
+        case .staticMode:
+            if staticSubMode == .solid {
+                service.applySingleColor(selectedColor)
+            } else {
+                if let p = AuraPreset.builtInPresets.first(where: { $0.id == "classic_rog" }) {
+                    service.applyPreset(p)
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 12)
+        case .breathing:
+            handleBreathingModeChanged(breathingSubMode)
+        case .colorCycle:
+            service.applyColorCycle(speed: service.currentSpeed)
+        case .rainbow:
+            service.applyRainbow(speed: service.currentSpeed)
+        case .strobing:
+            handleStrobingModeChanged(strobingSubMode)
+        }
+    }
 
-            // 2-Column Main Canvas (Homage to Windows AURA Core)
-            HStack(alignment: .top, spacing: 14) {
-                // LEFT: GL503 Physical Keyboard Stage (70% width)
-                AuraKeyboardStage(selectedSubTab: selectedSubTab, hexInputText: $hexInputText)
-                    .frame(maxWidth: .infinity)
-
-                // RIGHT: Controls Panel (30% width)
-                AuraControlsSidebar(
-                    selectedSubTab: $selectedSubTab,
-                    onApply: {
-                        triggerApply()
-                    }
-                )
-                .frame(width: 260)
+    private func handleColorChanged(_ color: RGBColor) {
+        selectedColor = color
+        hexInputText = color.upperHexString
+        switch selectedEffect {
+        case .staticMode:
+            service.applySingleColor(color)
+        case .breathing:
+            handleBreathingModeChanged(breathingSubMode)
+        case .strobing:
+            if strobingSubMode == .custom {
+                service.applyStrobing(color: color, speed: service.currentSpeed)
             }
-            .padding(.horizontal, 18)
-            .padding(.bottom, 16)
+        default:
+            break
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear {
-            hexInputText = activeColor.upperHexString
+    }
+
+    private func handleBreathingModeChanged(_ mode: BreathingSubMode) {
+        breathingSubMode = mode
+        switch mode {
+        case .single:
+            service.applyBreathing(c1: selectedColor, c2: nil, speed: service.currentSpeed)
+        case .dual:
+            service.applyBreathing(c1: selectedColor, c2: breathingColor2, speed: service.currentSpeed)
+        case .multi:
+            let multiColors: [RGBColor] = [selectedColor, breathingColor2, .cyan, .purple]
+            service.currentMode = .multiBreathing(multiColors, service.currentSpeed)
+            service.reapplyCurrentLighting()
         }
-        .onChange(of: service.activeEditingZoneIndex) {
-            hexInputText = activeColor.upperHexString
+    }
+
+    private func handleStrobingModeChanged(_ mode: StrobingSubMode) {
+        strobingSubMode = mode
+        switch mode {
+        case .custom:
+            service.applyStrobing(color: selectedColor, speed: service.currentSpeed)
+        case .multiRainbow:
+            service.applyMultiStrobing(speed: service.currentSpeed)
         }
     }
 
@@ -110,236 +262,399 @@ public struct AuraStudioView: View {
     }
 }
 
-// MARK: - Left Stage: GL503 Vector Keyboard Canvas
+// MARK: - 1. Studio Header
 
-struct AuraKeyboardStage: View {
+struct AuraStudioHeader: View {
     @ObservedObject var service = AuraService.shared
-    let selectedSubTab: AuraCoreSubTab
-    @Binding var hexInputText: String
-
-    private static let zone1KeyRows: [[String]] = [
-        ["ESC", "F1", "F2", "F3"],
-        ["~", "1", "2", "3"],
-        ["TAB", "Q", "W", "E"],
-        ["CAPS", "A", "S", "D"],
-        ["SHIFT", "Z", "X", "C"],
-        ["CTRL", "FN", "OPT", "CMD"]
-    ]
-
-    private static let zone2KeyRows: [[String]] = [
-        ["F4", "F5", "F6", "F7"],
-        ["4", "5", "6", "7"],
-        ["R", "T", "Y", "U"],
-        ["F", "G", "H", "J"],
-        ["V", "B", "N", "M"],
-        ["SPACE (L)", "CMD"]
-    ]
-
-    private static let zone3KeyRows: [[String]] = [
-        ["F8", "F9", "F10", "F11"],
-        ["8", "9", "0", "-"],
-        ["I", "O", "P", "["],
-        ["K", "L", ";", "'"],
-        [",", ".", "/", "SHIFT"],
-        ["SPACE (R)", "ALT", "CTRL"]
-    ]
-
-    private static let zone4KeyRows: [[String]] = [
-        ["F12", "DEL", "PAUSE", "PRT"],
-        ["=", "NUM", "/", "*"],
-        ["]", "7", "8", "9"],
-        ["ENT", "4", "5", "6"],
-        ["▲", "1", "2", "3"],
-        ["◄", "▼", "►", "0"]
-    ]
+    let showAppliedBanner: Bool
+    let onPowerToggle: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // Technical Crop Brackets Header
-            HStack {
-                Text("┌ ASUS ROG STRIX GL503 KEYBOARD CHASSIS")
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                    .foregroundColor(.secondary)
-                Spacer()
-                Text("4-ZONE RGB MATRIX ┐")
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                    .foregroundColor(.secondary)
+        HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(ROGColor.accent.opacity(0.15))
+                    .frame(width: 44, height: 44)
+
+                Image(systemName: "sparkles")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(ROGColor.accent)
             }
 
-            // Dedicated Top Hotkeys Row
-            HStack(spacing: 8) {
-                HotkeyCap(title: "VOL -", icon: "speaker.minus")
-                HotkeyCap(title: "VOL +", icon: "speaker.plus")
-                HotkeyCap(title: "MIC MUTE", icon: "mic.slash")
-                HotkeyCap(title: "ROG", icon: "flame.fill", isAccent: true)
-                Spacer()
-                Text(selectedSubTab == .custom4Zone ? "Click a zone to configure colors" : "Hardware animation active")
-                    .font(.system(size: 9))
-                    .foregroundColor(.secondary)
-            }
-            .padding(.horizontal, 6)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 8) {
+                    Text("Aura Core")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundColor(.primary)
 
-            // 4-Zone Keyboard Array
-            HStack(spacing: 6) {
-                ZoneChassisBlock(
-                    zoneIndex: 0,
-                    zoneName: "Zone 1 (WASD)",
-                    keyRows: Self.zone1KeyRows,
-                    color: service.zoneColors[0],
-                    isSelected: (service.activeEditingZoneIndex == 0 && selectedSubTab == .custom4Zone),
-                    isCustomMode: selectedSubTab == .custom4Zone
-                ) {
-                    if selectedSubTab == .custom4Zone {
-                        service.activeEditingZoneIndex = 0
-                    }
+                    AccentBadge(service.isPoweredOn ? "Backlight Active" : "Backlight Off", color: service.isPoweredOn ? ROGColor.good : .secondary)
                 }
 
-                ZoneChassisBlock(
-                    zoneIndex: 1,
-                    zoneName: "Zone 2 (Center-L)",
-                    keyRows: Self.zone2KeyRows,
-                    color: service.zoneColors[1],
-                    isSelected: (service.activeEditingZoneIndex == 1 && selectedSubTab == .custom4Zone),
-                    isCustomMode: selectedSubTab == .custom4Zone
-                ) {
-                    if selectedSubTab == .custom4Zone {
-                        service.activeEditingZoneIndex = 1
-                    }
-                }
-
-                ZoneChassisBlock(
-                    zoneIndex: 2,
-                    zoneName: "Zone 3 (Center-R)",
-                    keyRows: Self.zone3KeyRows,
-                    color: service.zoneColors[2],
-                    isSelected: (service.activeEditingZoneIndex == 2 && selectedSubTab == .custom4Zone),
-                    isCustomMode: selectedSubTab == .custom4Zone
-                ) {
-                    if selectedSubTab == .custom4Zone {
-                        service.activeEditingZoneIndex = 2
-                    }
-                }
-
-                ZoneChassisBlock(
-                    zoneIndex: 3,
-                    zoneName: "Zone 4 (Numpad)",
-                    keyRows: Self.zone4KeyRows,
-                    color: service.zoneColors[3],
-                    isSelected: (service.activeEditingZoneIndex == 3 && selectedSubTab == .custom4Zone),
-                    isCustomMode: selectedSubTab == .custom4Zone
-                ) {
-                    if selectedSubTab == .custom4Zone {
-                        service.activeEditingZoneIndex = 3
-                    }
-                }
-            }
-            .padding(8)
-            .background(Color.black.opacity(0.35))
-            .cornerRadius(10)
-
-            // Technical Bottom Bracket
-            HStack {
-                Text("└ GL503GE REVISION 2.0")
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                Text("ASUS ROG Strix GL503 / SCAR Hardware Backlight Studio")
+                    .font(.system(size: 11))
                     .foregroundColor(.secondary)
-                Spacer()
-                Text("ITE 8910 CONTROLLER ┘")
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                    .foregroundColor(.secondary)
-            }
-
-            // In 4-Zone Custom Mode: Inline Color Swatches & Hex Input
-            if selectedSubTab == .custom4Zone {
-                ZoneColorPickerToolbar(hexInputText: $hexInputText)
-            }
-        }
-        .padding(14)
-        .background(Color(NSColor.controlBackgroundColor).opacity(0.45))
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(NSColor.separatorColor).opacity(0.5), lineWidth: 0.5)
-        )
-    }
-}
-
-// MARK: - Zone Color Picker Toolbar
-
-struct ZoneColorPickerToolbar: View {
-    @ObservedObject var service = AuraService.shared
-    @Binding var hexInputText: String
-
-    var body: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Editing Zone \(service.activeEditingZoneIndex + 1)")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(.primary)
-                Text("Pick quick swatch or custom hex")
-                    .font(.system(size: 9))
-                    .foregroundColor(.secondary)
-            }
-
-            // Quick Palette
-            HStack(spacing: 6) {
-                QuickColorDot(color: .rogRed) { setZoneColor(.rogRed) }
-                QuickColorDot(color: .orange) { setZoneColor(.orange) }
-                QuickColorDot(color: .yellow) { setZoneColor(.yellow) }
-                QuickColorDot(color: .green) { setZoneColor(.green) }
-                QuickColorDot(color: .cyan) { setZoneColor(.cyan) }
-                QuickColorDot(color: .blue) { setZoneColor(.blue) }
-                QuickColorDot(color: .purple) { setZoneColor(.purple) }
-                QuickColorDot(color: .white) { setZoneColor(.white) }
             }
 
             Spacer()
 
-            // Hex Input
-            HStack(spacing: 4) {
-                Text("#")
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .foregroundColor(.secondary)
-                TextField("RRGGBB", text: $hexInputText)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .font(.system(size: 11, design: .monospaced))
-                    .frame(width: 70)
-                    .onSubmit {
-                        if let c = RGBColor(hex: hexInputText) {
-                            setZoneColor(c)
-                        }
-                    }
+            if showAppliedBanner {
+                HStack(spacing: 5) {
+                    Image(systemName: "checkmark.circle.fill")
+                    Text("Applied to Hardware")
+                }
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(ROGColor.good)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(ROGColor.good.opacity(0.12))
+                .cornerRadius(ROGRadius.control)
+                .transition(.opacity)
             }
 
-            // Native macOS Color Wheel Button
-            Button(action: {
-                NSColorPanel.shared.orderFront(nil)
-            }) {
-                HStack(spacing: 4) {
-                    Image(systemName: "paintpalette.fill")
-                    Text("Wheel")
+            // Power Toggle Button
+            Button(action: onPowerToggle) {
+                HStack(spacing: 6) {
+                    Image(systemName: service.isPoweredOn ? "power" : "power.circle")
+                        .font(.system(size: 12, weight: .bold))
+                    Text(service.isPoweredOn ? "Power On" : "Power Off")
+                        .font(.system(size: 11, weight: .medium))
                 }
-                .font(.system(size: 10, weight: .medium))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Color(NSColor.controlColor).opacity(0.8))
-                .cornerRadius(6)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(service.isPoweredOn ? ROGColor.good.opacity(0.16) : Color(NSColor.controlColor).opacity(0.6))
+                .foregroundColor(service.isPoweredOn ? ROGColor.good : .secondary)
+                .cornerRadius(ROGRadius.control)
+                .overlay(
+                    RoundedRectangle(cornerRadius: ROGRadius.control)
+                        .stroke(service.isPoweredOn ? ROGColor.good.opacity(0.4) : ROGColor.hairline, lineWidth: 0.5)
+                )
             }
             .buttonStyle(PlainButtonStyle())
         }
-        .padding(10)
-        .background(Color(NSColor.controlBackgroundColor).opacity(0.6))
-        .cornerRadius(8)
-    }
-
-    private func setZoneColor(_ color: RGBColor) {
-        service.setZoneColor(zoneIndex: service.activeEditingZoneIndex, color: color)
-        hexInputText = color.upperHexString
     }
 }
 
-// MARK: - Dedicated Hotkey Cap
+// MARK: - 2. Seamless Keyboard Deck
 
-struct HotkeyCap: View {
+struct AuraSeamlessKeyboardDeck: View {
+    @ObservedObject var service = AuraService.shared
+    let selectedEffect: AuraEffectCategory
+    let activeColor: RGBColor
+    let breathingColor2: RGBColor
+
+    @State private var animPhase: Double = 0.0
+    private let dynamicTimer = Timer.publish(every: 0.08, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // Dedicated Top Hotkeys Row
+            HStack(spacing: 8) {
+                KeyboardHotkeyPill(title: "VOL -", icon: "speaker.minus")
+                KeyboardHotkeyPill(title: "VOL +", icon: "speaker.plus")
+                KeyboardHotkeyPill(title: "MIC MUTE", icon: "mic.slash")
+                KeyboardHotkeyPill(title: "ROG", icon: "flame.fill", isAccent: true)
+
+                Spacer()
+
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(service.isConnected ? ROGColor.good : ROGColor.warn)
+                        .frame(width: 6, height: 6)
+                    Text(service.isConnected ? "ITE 8910 Latched" : "Controller Standby")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(.horizontal, 4)
+
+            // The Seamless Laptop Keyboard Matrix
+            VStack(spacing: 4) {
+                // Function Row (Esc, F1-F12, Del, PrtSc, Pause)
+                HStack(spacing: 3) {
+                    Keycap(label: "ESC", width: 28, color: keyColor(xFraction: 0.02))
+                    Spacer().frame(width: 6)
+                    Keycap(label: "F1", width: 22, color: keyColor(xFraction: 0.08))
+                    Keycap(label: "F2", width: 22, color: keyColor(xFraction: 0.12))
+                    Keycap(label: "F3", width: 22, color: keyColor(xFraction: 0.16))
+                    Keycap(label: "F4", width: 22, color: keyColor(xFraction: 0.20))
+                    Spacer().frame(width: 6)
+                    Keycap(label: "F5", width: 22, color: keyColor(xFraction: 0.28))
+                    Keycap(label: "F6", width: 22, color: keyColor(xFraction: 0.32))
+                    Keycap(label: "F7", width: 22, color: keyColor(xFraction: 0.36))
+                    Keycap(label: "F8", width: 22, color: keyColor(xFraction: 0.40))
+                    Spacer().frame(width: 6)
+                    Keycap(label: "F9", width: 22, color: keyColor(xFraction: 0.48))
+                    Keycap(label: "F10", width: 22, color: keyColor(xFraction: 0.52))
+                    Keycap(label: "F11", width: 22, color: keyColor(xFraction: 0.56))
+                    Keycap(label: "F12", width: 22, color: keyColor(xFraction: 0.60))
+                    Spacer().frame(width: 8)
+                    Keycap(label: "DEL", width: 24, color: keyColor(xFraction: 0.72))
+                    Keycap(label: "PRT", width: 24, color: keyColor(xFraction: 0.78))
+                    Keycap(label: "PAU", width: 24, color: keyColor(xFraction: 0.84))
+                    Spacer()
+                }
+
+                // Number Row (`~` through Backspace, plus Numpad Top)
+                HStack(spacing: 3) {
+                    Keycap(label: "~", width: 22, color: keyColor(xFraction: 0.02))
+                    Keycap(label: "1", width: 22, color: keyColor(xFraction: 0.06))
+                    Keycap(label: "2", width: 22, color: keyColor(xFraction: 0.10))
+                    Keycap(label: "3", width: 22, color: keyColor(xFraction: 0.14))
+                    Keycap(label: "4", width: 22, color: keyColor(xFraction: 0.18))
+                    Keycap(label: "5", width: 22, color: keyColor(xFraction: 0.22))
+                    Keycap(label: "6", width: 22, color: keyColor(xFraction: 0.26))
+                    Keycap(label: "7", width: 22, color: keyColor(xFraction: 0.30))
+                    Keycap(label: "8", width: 22, color: keyColor(xFraction: 0.34))
+                    Keycap(label: "9", width: 22, color: keyColor(xFraction: 0.38))
+                    Keycap(label: "0", width: 22, color: keyColor(xFraction: 0.42))
+                    Keycap(label: "-", width: 22, color: keyColor(xFraction: 0.46))
+                    Keycap(label: "=", width: 22, color: keyColor(xFraction: 0.50))
+                    Keycap(label: "BKSP", width: 44, color: keyColor(xFraction: 0.58))
+                    Spacer().frame(width: 8)
+                    Keycap(label: "NUM", width: 24, color: keyColor(xFraction: 0.74))
+                    Keycap(label: "/", width: 24, color: keyColor(xFraction: 0.80))
+                    Keycap(label: "*", width: 24, color: keyColor(xFraction: 0.86))
+                    Keycap(label: "-", width: 24, color: keyColor(xFraction: 0.92))
+                    Spacer()
+                }
+
+                // QWERTY Row (Tab 1.5u, Q..P, [, ], \, Numpad 789+)
+                HStack(spacing: 3) {
+                    Keycap(label: "TAB", width: 34, color: keyColor(xFraction: 0.03))
+                    Keycap(label: "Q", width: 22, color: keyColor(xFraction: 0.08))
+                    Keycap(label: "W", width: 22, color: keyColor(xFraction: 0.12), isWASD: true)
+                    Keycap(label: "E", width: 22, color: keyColor(xFraction: 0.16))
+                    Keycap(label: "R", width: 22, color: keyColor(xFraction: 0.20))
+                    Keycap(label: "T", width: 22, color: keyColor(xFraction: 0.24))
+                    Keycap(label: "Y", width: 22, color: keyColor(xFraction: 0.28))
+                    Keycap(label: "U", width: 22, color: keyColor(xFraction: 0.32))
+                    Keycap(label: "I", width: 22, color: keyColor(xFraction: 0.36))
+                    Keycap(label: "O", width: 22, color: keyColor(xFraction: 0.40))
+                    Keycap(label: "P", width: 22, color: keyColor(xFraction: 0.44))
+                    Keycap(label: "[", width: 22, color: keyColor(xFraction: 0.48))
+                    Keycap(label: "]", width: 22, color: keyColor(xFraction: 0.52))
+                    Keycap(label: "\\", width: 32, color: keyColor(xFraction: 0.58))
+                    Spacer().frame(width: 8)
+                    Keycap(label: "7", width: 24, color: keyColor(xFraction: 0.74))
+                    Keycap(label: "8", width: 24, color: keyColor(xFraction: 0.80))
+                    Keycap(label: "9", width: 24, color: keyColor(xFraction: 0.86))
+                    Keycap(label: "+", width: 24, color: keyColor(xFraction: 0.92))
+                    Spacer()
+                }
+
+                // Home Row (Caps 1.75u, A..L, ;, ', Enter 2.25u, Numpad 456)
+                HStack(spacing: 3) {
+                    Keycap(label: "CAPS", width: 40, color: keyColor(xFraction: 0.04))
+                    Keycap(label: "A", width: 22, color: keyColor(xFraction: 0.10), isWASD: true)
+                    Keycap(label: "S", width: 22, color: keyColor(xFraction: 0.14), isWASD: true)
+                    Keycap(label: "D", width: 22, color: keyColor(xFraction: 0.18), isWASD: true)
+                    Keycap(label: "F", width: 22, color: keyColor(xFraction: 0.22))
+                    Keycap(label: "G", width: 22, color: keyColor(xFraction: 0.26))
+                    Keycap(label: "H", width: 22, color: keyColor(xFraction: 0.30))
+                    Keycap(label: "J", width: 22, color: keyColor(xFraction: 0.34))
+                    Keycap(label: "K", width: 22, color: keyColor(xFraction: 0.38))
+                    Keycap(label: "L", width: 22, color: keyColor(xFraction: 0.42))
+                    Keycap(label: ";", width: 22, color: keyColor(xFraction: 0.46))
+                    Keycap(label: "'", width: 22, color: keyColor(xFraction: 0.50))
+                    Keycap(label: "ENTER", width: 48, color: keyColor(xFraction: 0.59))
+                    Spacer().frame(width: 8)
+                    Keycap(label: "4", width: 24, color: keyColor(xFraction: 0.74))
+                    Keycap(label: "5", width: 24, color: keyColor(xFraction: 0.80))
+                    Keycap(label: "6", width: 24, color: keyColor(xFraction: 0.86))
+                    Spacer()
+                }
+
+                // Shift Row (L-Shift 2.25u, Z../, R-Shift 1.75u, Numpad 123 Enter)
+                HStack(spacing: 3) {
+                    Keycap(label: "SHIFT", width: 50, color: keyColor(xFraction: 0.05))
+                    Keycap(label: "Z", width: 22, color: keyColor(xFraction: 0.12))
+                    Keycap(label: "X", width: 22, color: keyColor(xFraction: 0.16))
+                    Keycap(label: "C", width: 22, color: keyColor(xFraction: 0.20))
+                    Keycap(label: "V", width: 22, color: keyColor(xFraction: 0.24))
+                    Keycap(label: "B", width: 22, color: keyColor(xFraction: 0.28))
+                    Keycap(label: "N", width: 22, color: keyColor(xFraction: 0.32))
+                    Keycap(label: "M", width: 22, color: keyColor(xFraction: 0.36))
+                    Keycap(label: ",", width: 22, color: keyColor(xFraction: 0.40))
+                    Keycap(label: ".", width: 22, color: keyColor(xFraction: 0.44))
+                    Keycap(label: "/", width: 22, color: keyColor(xFraction: 0.48))
+                    Keycap(label: "SHIFT", width: 38, color: keyColor(xFraction: 0.56))
+                    Spacer().frame(width: 8)
+                    Keycap(label: "1", width: 24, color: keyColor(xFraction: 0.74))
+                    Keycap(label: "2", width: 24, color: keyColor(xFraction: 0.80))
+                    Keycap(label: "3", width: 24, color: keyColor(xFraction: 0.86))
+                    Keycap(label: "ENT", width: 24, color: keyColor(xFraction: 0.92))
+                    Spacer()
+                }
+
+                // Bottom Row (Ctrl, Fn, Opt, Cmd, Spacebar, Cmd, Opt, Arrows, Numpad 0 .)
+                HStack(spacing: 3) {
+                    Keycap(label: "CTRL", width: 26, color: keyColor(xFraction: 0.03))
+                    Keycap(label: "FN", width: 20, color: keyColor(xFraction: 0.07))
+                    Keycap(label: "OPT", width: 20, color: keyColor(xFraction: 0.11))
+                    Keycap(label: "CMD", width: 26, color: keyColor(xFraction: 0.15))
+                    Keycap(label: "SPACEBAR", width: 140, color: keyColor(xFraction: 0.30))
+                    Keycap(label: "CMD", width: 26, color: keyColor(xFraction: 0.46))
+                    Keycap(label: "OPT", width: 20, color: keyColor(xFraction: 0.52))
+                    Spacer().frame(width: 8)
+
+                    // Arrow Cluster (◄, ▼, ► with ▲ placed directly above)
+                    HStack(spacing: 2) {
+                        Keycap(label: "◄", width: 18, color: keyColor(xFraction: 0.65))
+                        VStack(spacing: 2) {
+                            Keycap(label: "▲", width: 18, color: keyColor(xFraction: 0.68))
+                            Keycap(label: "▼", width: 18, color: keyColor(xFraction: 0.68))
+                        }
+                        Keycap(label: "►", width: 18, color: keyColor(xFraction: 0.71))
+                    }
+
+                    Spacer().frame(width: 8)
+                    Keycap(label: "0", width: 44, color: keyColor(xFraction: 0.80))
+                    Keycap(label: ".", width: 24, color: keyColor(xFraction: 0.88))
+                    Spacer()
+                }
+            }
+            .padding(14)
+            .background(
+                ZStack {
+                    // Under-deck dark chassis
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color(NSColor.windowBackgroundColor).opacity(0.75))
+
+                    // Diffuse ambient LED underglow layer
+                    underglowLayer
+                        .blur(radius: 16)
+                        .opacity(service.isPoweredOn ? 0.35 : 0.0)
+                }
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(ROGColor.hairline, lineWidth: 0.75)
+            )
+        }
+        .glassCard(radius: ROGRadius.card, padding: 14)
+        .onReceive(dynamicTimer) { _ in
+            guard service.isPoweredOn && selectedEffect != .staticMode else { return }
+            animPhase = (animPhase + 0.025).truncatingRemainder(dividingBy: 1.0)
+        }
+    }
+
+    // Dynamic color computation for each key depending on effect mode
+    private func keyColor(xFraction: Double) -> Color {
+        guard service.isPoweredOn else {
+            return Color.white.opacity(0.12)
+        }
+
+        switch selectedEffect {
+        case .staticMode:
+            if case .multiStatic(let zones) = service.currentMode, zones.count == 4 {
+                let zoneIdx = min(3, Int(xFraction * 4.0))
+                return Color(rgb: zones[zoneIdx])
+            }
+            return Color(rgb: activeColor)
+
+        case .rainbow:
+            let hue = (animPhase + xFraction).truncatingRemainder(dividingBy: 1.0)
+            return Color(hue: hue, saturation: 0.95, brightness: 1.0)
+
+        case .colorCycle:
+            return Color(hue: animPhase, saturation: 0.95, brightness: 1.0)
+
+        case .breathing:
+            let wave = (sin(animPhase * .pi * 2) + 1.0) / 2.0 // 0.0 to 1.0
+            if breathingColor2 != .black && breathingColor2 != activeColor {
+                let c1 = Color(rgb: activeColor)
+                let c2 = Color(rgb: breathingColor2)
+                return wave > 0.5 ? c1.opacity(0.2 + 0.8 * (wave - 0.5) * 2.0) : c2.opacity(0.2 + 0.8 * (0.5 - wave) * 2.0)
+            } else {
+                let c1 = Color(rgb: activeColor)
+                return c1.opacity(0.20 + 0.80 * wave)
+            }
+
+        case .strobing:
+            let flash = (Int(animPhase * 20) % 2 == 0)
+            if flash {
+                if service.activePresetId == "multi_strobing" {
+                    let strobeHue = Double(Int(animPhase * 10) % 8) / 8.0
+                    return Color(hue: strobeHue, saturation: 0.95, brightness: 1.0)
+                }
+                return Color(rgb: activeColor)
+            } else {
+                return Color.white.opacity(0.1)
+            }
+        }
+    }
+
+    // Diffuse underglow gradient
+    private var underglowLayer: some View {
+        Group {
+            switch selectedEffect {
+            case .rainbow:
+                LinearGradient(
+                    colors: [.red, .orange, .yellow, .green, .cyan, .blue, .purple, .red],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            case .colorCycle:
+                Color(hue: animPhase, saturation: 0.9, brightness: 1.0)
+            case .breathing:
+                Color(rgb: activeColor)
+            case .strobing:
+                Color(rgb: activeColor)
+            case .staticMode:
+                if case .multiStatic(let zones) = service.currentMode, zones.count == 4 {
+                    LinearGradient(
+                        colors: zones.map { Color(rgb: $0) },
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                } else {
+                    Color(rgb: activeColor)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Keycap Component
+
+struct Keycap: View, Equatable {
+    let label: String
+    let width: CGFloat
+    let color: Color
+    var isWASD: Bool = false
+
+    static func == (lhs: Keycap, rhs: Keycap) -> Bool {
+        lhs.label == rhs.label && lhs.width == rhs.width && lhs.color == rhs.color && lhs.isWASD == rhs.isWASD
+    }
+
+    var body: some View {
+        ZStack {
+            // Keycap body
+            RoundedRectangle(cornerRadius: 3.5, style: .continuous)
+                .fill(
+                    isWASD
+                        ? LinearGradient(colors: [Color.white.opacity(0.9), Color.white.opacity(0.75)], startPoint: .top, endPoint: .bottom)
+                        : LinearGradient(colors: [Color.black.opacity(0.7), Color.black.opacity(0.85)], startPoint: .top, endPoint: .bottom)
+                )
+
+            // Inner LED glow bleed
+            RoundedRectangle(cornerRadius: 3.5, style: .continuous)
+                .fill(color.opacity(isWASD ? 0.85 : 0.45))
+
+            // Keycap Legend Text
+            Text(label)
+                .font(.system(size: label.count > 3 ? 7.5 : 8.5, weight: isWASD ? .heavy : .bold, design: .rounded))
+                .foregroundColor(isWASD ? .black : .white.opacity(0.95))
+        }
+        .frame(width: width, height: 19)
+        .overlay(
+            RoundedRectangle(cornerRadius: 3.5, style: .continuous)
+                .stroke(isWASD ? ROGColor.accent.opacity(0.7) : color.opacity(0.6), lineWidth: isWASD ? 1.0 : 0.5)
+        )
+    }
+}
+
+struct KeyboardHotkeyPill: View {
     let title: String
     let icon: String
     var isAccent: Bool = false
@@ -347,289 +662,543 @@ struct HotkeyCap: View {
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: icon)
-                .font(.system(size: 8, weight: .bold))
+                .font(.system(size: 8.5, weight: .bold))
             Text(title)
-                .font(.system(size: 8, weight: .bold, design: .monospaced))
+                .font(.system(size: 8.5, weight: .semibold))
         }
-        .foregroundColor(isAccent ? .red : .secondary)
-        .padding(.horizontal, 6)
-        .padding(.vertical, 3)
-        .background(Color.black.opacity(0.35))
-        .cornerRadius(4)
+        .foregroundColor(isAccent ? ROGColor.accent : .secondary)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 3.5)
+        .background(Color(NSColor.controlBackgroundColor).opacity(0.6))
+        .cornerRadius(ROGRadius.control)
         .overlay(
-            RoundedRectangle(cornerRadius: 4)
-                .stroke(isAccent ? Color.red.opacity(0.6) : Color.white.opacity(0.1), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: ROGRadius.control)
+                .stroke(isAccent ? ROGColor.accent.opacity(0.5) : ROGColor.hairline, lineWidth: 0.5)
         )
     }
 }
 
-// MARK: - Zone Keycap Block
+// MARK: - 3. Effects Gallery (5 Visual Cards)
 
-struct ZoneChassisBlock: View {
-    let zoneIndex: Int
-    let zoneName: String
-    let keyRows: [[String]]
-    let color: RGBColor
-    let isSelected: Bool
-    let isCustomMode: Bool
-    let onTap: () -> Void
-
-    var displayColor: Color {
-        Color(rgb: color)
-    }
+struct AuraEffectsGallery: View {
+    @Binding var selectedEffect: AuraEffectCategory
+    let onSelect: (AuraEffectCategory) -> Void
 
     var body: some View {
-        VStack(spacing: 4) {
-            // Key Grid
-            VStack(spacing: 2) {
-                ForEach(0..<keyRows.count, id: \.self) { r in
-                    HStack(spacing: 2) {
-                        ForEach(0..<keyRows[r].count, id: \.self) { c in
-                            let label = keyRows[r][c]
-                            let isWASD = (zoneIndex == 0 && (label == "W" || label == "A" || label == "S" || label == "D"))
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel("Lighting Effects", systemImage: "sparkles")
 
-                            Text(label)
-                                .font(.system(size: 7, weight: isWASD ? .bold : .medium, design: .monospaced))
-                                .foregroundColor(isWASD ? .white : .primary.opacity(0.85))
-                                .frame(maxWidth: .infinity, minHeight: 12)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 1.5)
-                                        .fill(isWASD ? displayColor.opacity(0.9) : displayColor.opacity(0.35))
-                                )
-                        }
+            HStack(spacing: 10) {
+                ForEach(AuraEffectCategory.allCases) { effect in
+                    EffectVisualCard(
+                        effect: effect,
+                        isSelected: selectedEffect == effect
+                    ) {
+                        onSelect(effect)
                     }
                 }
             }
-            .padding(4)
-            .background(Color(NSColor.controlBackgroundColor).opacity(0.3))
-            .cornerRadius(5)
-
-            // Zone Footer Tag
-            HStack(spacing: 3) {
-                Circle()
-                    .fill(displayColor)
-                    .frame(width: 5, height: 5)
-                Text(zoneName)
-                    .font(.system(size: 9, weight: isSelected ? .bold : .regular))
-                    .foregroundColor(isSelected ? .red : .secondary)
-                Spacer()
-            }
-        }
-        .padding(6)
-        .frame(maxWidth: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: 7)
-                .fill(isSelected ? Color.red.opacity(0.12) : Color.clear)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 7)
-                .stroke(isSelected ? Color.red : Color.clear, lineWidth: 1.5)
-        )
-        .onTapGesture {
-            onTap()
         }
     }
 }
 
-// MARK: - Quick Color Dot
-
-struct QuickColorDot: View {
-    let color: RGBColor
+struct EffectVisualCard: View {
+    let effect: AuraEffectCategory
+    let isSelected: Bool
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Circle()
-                .fill(Color(rgb: color))
-                .frame(width: 16, height: 16)
-                .overlay(Circle().stroke(Color.white.opacity(0.3), lineWidth: 0.5))
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    ZStack {
+                        Circle()
+                            .fill(isSelected ? ROGColor.accent.opacity(0.2) : Color.white.opacity(0.08))
+                            .frame(width: 28, height: 28)
+
+                        Image(systemName: effect.icon)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(isSelected ? ROGColor.accent : .secondary)
+                    }
+
+                    Spacer()
+
+                    if isSelected {
+                        Circle()
+                            .fill(ROGColor.accent)
+                            .frame(width: 7, height: 7)
+                    }
+                }
+
+                Text(effect.rawValue)
+                    .font(.system(size: 12, weight: isSelected ? .bold : .semibold))
+                    .foregroundColor(isSelected ? .primary : .secondary)
+
+                Text(effect.subtitle)
+                    .font(.system(size: 9.5))
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: ROGRadius.tile, style: .continuous)
+                    .fill(isSelected ? ROGColor.accentSoft : Color(NSColor.controlBackgroundColor).opacity(0.55))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: ROGRadius.tile, style: .continuous)
+                    .stroke(isSelected ? ROGColor.accent : ROGColor.hairline, lineWidth: isSelected ? 1.5 : 0.75)
+            )
+            .shadow(color: isSelected ? ROGColor.accent.opacity(0.2) : .clear, radius: 8, y: 3)
         }
         .buttonStyle(PlainButtonStyle())
     }
 }
 
-// MARK: - Right Column: Aura Controls Stack
+// MARK: - 4. Contextual Controls Deck
 
-struct AuraControlsSidebar: View {
+struct AuraContextualControlsDeck: View {
     @ObservedObject var service = AuraService.shared
-    @Binding var selectedSubTab: AuraCoreSubTab
+
+    let selectedEffect: AuraEffectCategory
+    @Binding var staticSubMode: StaticSubMode
+    @Binding var breathingSubMode: BreathingSubMode
+    @Binding var strobingSubMode: StrobingSubMode
+    @Binding var selectedColor: RGBColor
+    @Binding var breathingColor2: RGBColor
+    @Binding var hexInputText: String
+
+    let onColorChanged: (RGBColor) -> Void
+    let onThemeSelected: (AuraPreset) -> Void
+    let onBreathingModeChanged: (BreathingSubMode) -> Void
+    let onStrobingModeChanged: (StrobingSubMode) -> Void
     let onApply: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // 1. Brightness Slider
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text("BRIGHTNESS")
-                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+        VStack(alignment: .leading, spacing: 14) {
+            // A. Contextual Mode Sub-Options
+            switch selectedEffect {
+            case .staticMode:
+                StaticSubOptionsView(
+                    subMode: $staticSubMode,
+                    selectedColor: $selectedColor,
+                    hexInputText: $hexInputText,
+                    onColorChanged: onColorChanged,
+                    onThemeSelected: onThemeSelected
+                )
+
+            case .breathing:
+                BreathingSubOptionsView(
+                    subMode: $breathingSubMode,
+                    c1: $selectedColor,
+                    c2: $breathingColor2,
+                    onModeChanged: onBreathingModeChanged
+                )
+
+            case .colorCycle:
+                ColorCycleSubOptionsView()
+
+            case .rainbow:
+                RainbowSubOptionsView()
+
+            case .strobing:
+                StrobingSubOptionsView(
+                    subMode: $strobingSubMode,
+                    selectedColor: $selectedColor,
+                    hexInputText: $hexInputText,
+                    onColorChanged: onColorChanged,
+                    onModeChanged: onStrobingModeChanged
+                )
+            }
+
+            Divider().background(ROGColor.hairline)
+
+            // B. Hardware Attributes Strip (Brightness, Tempo, Apply)
+            HStack(spacing: 16) {
+                // Brightness Segment
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Brightness")
+                        .font(ROGType.footnote())
+                        .foregroundColor(.secondary)
+
+                    HStack(spacing: 4) {
+                        BrightnessPill(title: "Off", isSelected: !service.isPoweredOn || service.currentBrightness == 0) {
+                            service.setBrightness(0)
+                        }
+                        BrightnessPill(title: "33%", isSelected: service.isPoweredOn && service.currentBrightness == 1) {
+                            service.setBrightness(1)
+                        }
+                        BrightnessPill(title: "66%", isSelected: service.isPoweredOn && service.currentBrightness == 2) {
+                            service.setBrightness(2)
+                        }
+                        BrightnessPill(title: "100%", isSelected: service.isPoweredOn && service.currentBrightness == 3) {
+                            service.setBrightness(3)
+                        }
+                    }
+                }
+
+                // Animation Speed (Shown for dynamic modes)
+                if selectedEffect != .staticMode {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Tempo")
+                            .font(ROGType.footnote())
+                            .foregroundColor(.secondary)
+
+                        HStack(spacing: 4) {
+                            TempoSegmentPill(title: "Slow", isSelected: service.currentSpeed == .slow) {
+                                service.setSpeed(.slow)
+                            }
+                            TempoSegmentPill(title: "Medium", isSelected: service.currentSpeed == .medium) {
+                                service.setSpeed(.medium)
+                            }
+                            TempoSegmentPill(title: "Fast", isSelected: service.currentSpeed == .fast) {
+                                service.setSpeed(.fast)
+                            }
+                        }
+                    }
+                }
+
+                Spacer()
+
+                // Primary Apply Button
+                Button(action: onApply) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 12, weight: .bold))
+                        Text("Apply to Keyboard")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: ROGRadius.control, style: .continuous)
+                            .fill(ROGColor.accent)
+                    )
+                    .shadow(color: ROGColor.accent.opacity(0.35), radius: 8, y: 3)
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+        }
+        .glassCard(radius: ROGRadius.card, padding: 16)
+    }
+}
+
+// MARK: - Sub-Options Views
+
+struct StaticSubOptionsView: View {
+    @Binding var subMode: StaticSubMode
+    @Binding var selectedColor: RGBColor
+    @Binding var hexInputText: String
+    let onColorChanged: (RGBColor) -> Void
+    let onThemeSelected: (AuraPreset) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Static Mode:")
+                    .font(ROGType.bodyEmphasized())
+
+                Picker("", selection: $subMode) {
+                    ForEach(StaticSubMode.allCases) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+                .pickerStyle(SegmentedPickerStyle())
+                .frame(width: 220)
+
+                Spacer()
+            }
+
+            if subMode == .solid {
+                ColorPaletteRow(
+                    selectedColor: $selectedColor,
+                    hexInputText: $hexInputText,
+                    onColorChanged: onColorChanged
+                )
+            } else {
+                // Curated Multi-Color Themes Grid
+                ThemesGrid(onThemeSelected: onThemeSelected)
+            }
+        }
+    }
+}
+
+struct BreathingSubOptionsView: View {
+    @Binding var subMode: BreathingSubMode
+    @Binding var c1: RGBColor
+    @Binding var c2: RGBColor
+    let onModeChanged: (BreathingSubMode) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Breathing Style:")
+                    .font(ROGType.bodyEmphasized())
+
+                Picker("", selection: $subMode) {
+                    ForEach(BreathingSubMode.allCases) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+                .pickerStyle(SegmentedPickerStyle())
+                .frame(width: 260)
+                .onChange(of: subMode) { mode in
+                    onModeChanged(mode)
+                }
+
+                Spacer()
+            }
+
+            if subMode == .single {
+                HStack(spacing: 8) {
+                    Text("Pulse Color:")
+                        .font(ROGType.footnote())
+                        .foregroundColor(.secondary)
+
+                    QuickPaletteDots(selectedColor: $c1) { col in
+                        c1 = col
+                        onModeChanged(.single)
+                    }
+                }
+            } else if subMode == .dual {
+                HStack(spacing: 16) {
+                    HStack(spacing: 6) {
+                        Text("Color 1:")
+                            .font(ROGType.footnote())
+                            .foregroundColor(.secondary)
+                        QuickPaletteDots(selectedColor: $c1) { col in
+                            c1 = col
+                            onModeChanged(.dual)
+                        }
+                    }
+
+                    HStack(spacing: 6) {
+                        Text("Color 2:")
+                            .font(ROGType.footnote())
+                            .foregroundColor(.secondary)
+                        QuickPaletteDots(selectedColor: $c2) { col in
+                            c2 = col
+                            onModeChanged(.dual)
+                        }
+                    }
+                }
+            } else {
+                Text("Multi-color spectrum breathing cycles across all 4 zones automatically.")
+                    .font(ROGType.footnote())
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
+}
+
+struct ColorCycleSubOptionsView: View {
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "sparkles")
+                .foregroundColor(ROGColor.accent)
+            Text("Full spectrum phase cycle automatically transitions through every color in sync.")
+                .font(ROGType.footnote())
+                .foregroundColor(.secondary)
+            Spacer()
+        }
+    }
+}
+
+struct RainbowSubOptionsView: View {
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "rainbow")
+                .foregroundColor(.cyan)
+            Text("Hardware Mode 3: Autonomous rolling chromatic wave flows dynamically across all keys.")
+                .font(ROGType.footnote())
+                .foregroundColor(.secondary)
+            Spacer()
+            AccentBadge("Multi-Color Flow", color: .cyan)
+        }
+    }
+}
+
+struct StrobingSubOptionsView: View {
+    @Binding var subMode: StrobingSubMode
+    @Binding var selectedColor: RGBColor
+    @Binding var hexInputText: String
+    let onColorChanged: (RGBColor) -> Void
+    let onModeChanged: (StrobingSubMode) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Strobe Mode:")
+                    .font(ROGType.bodyEmphasized())
+
+                Picker("", selection: $subMode) {
+                    ForEach(StrobingSubMode.allCases) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+                .pickerStyle(SegmentedPickerStyle())
+                .frame(width: 250)
+                .onChange(of: subMode) { mode in
+                    onModeChanged(mode)
+                }
+
+                Spacer()
+            }
+
+            if subMode == .custom {
+                ColorPaletteRow(
+                    selectedColor: $selectedColor,
+                    hexInputText: $hexInputText,
+                    onColorChanged: onColorChanged
+                )
+            } else {
+                HStack(spacing: 8) {
+                    Image(systemName: "bolt.fill")
+                        .foregroundColor(ROGColor.warn)
+                    Text("Multi-color strobe rapidly flashes alternating spectrum colors on every pulse.")
+                        .font(ROGType.footnote())
                         .foregroundColor(.secondary)
                     Spacer()
-                    Text(service.isPoweredOn ? "\(service.currentBrightness * 33)%" : "Off")
-                        .font(.system(size: 11, weight: .bold, design: .monospaced))
-                        .foregroundColor(.primary)
-                }
-
-                HStack(spacing: 4) {
-                    BrightnessSegmentButton(title: "Off", isSelected: !service.isPoweredOn || service.currentBrightness == 0) {
-                        service.setBrightness(0)
-                        HUDService.shared.showBacklightHUD(level: 0)
-                    }
-                    BrightnessSegmentButton(title: "33%", isSelected: service.isPoweredOn && service.currentBrightness == 1) {
-                        service.setBrightness(1)
-                        HUDService.shared.showBacklightHUD(level: 1)
-                    }
-                    BrightnessSegmentButton(title: "66%", isSelected: service.isPoweredOn && service.currentBrightness == 2) {
-                        service.setBrightness(2)
-                        HUDService.shared.showBacklightHUD(level: 2)
-                    }
-                    BrightnessSegmentButton(title: "100%", isSelected: service.isPoweredOn && service.currentBrightness == 3) {
-                        service.setBrightness(3)
-                        HUDService.shared.showBacklightHUD(level: 3)
-                    }
+                    AccentBadge("Rainbow Flash", color: ROGColor.warn)
                 }
             }
-            .padding(10)
-            .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
-            .cornerRadius(8)
+        }
+    }
+}
 
-            // 2. Lighting Effects List (Matching Windows AURA radio list)
-            VStack(alignment: .leading, spacing: 8) {
-                Text("[ EFFECTS ]")
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundColor(.secondary)
+// MARK: - Color Palette Row
 
-                VStack(spacing: 3) {
-                    EffectRowRadio(
-                        title: "STATIC",
-                        subtitle: "Constant RGB luminescence",
-                        isSelected: isCurrentModeStatic(),
-                        icon: "lightbulb.fill"
-                    ) {
-                        selectedSubTab = .basicEffects
-                        service.applySingleColor(service.zoneColors.first ?? .rogRed)
-                    }
+struct ColorPaletteRow: View {
+    @Binding var selectedColor: RGBColor
+    @Binding var hexInputText: String
+    let onColorChanged: (RGBColor) -> Void
 
-                    EffectRowRadio(
-                        title: "BREATHING",
-                        subtitle: "Smooth rhythmic cycle",
-                        isSelected: isCurrentModeBreathing(),
-                        icon: "water.waves"
-                    ) {
-                        selectedSubTab = .basicEffects
-                        service.applyPreset(AuraPreset.builtInPresets[9])
-                    }
-
-                    EffectRowRadio(
-                        title: "COLOR CYCLE",
-                        subtitle: "Full spectrum shift",
-                        isSelected: isCurrentModeColorCycle(),
-                        icon: "sparkles"
-                    ) {
-                        selectedSubTab = .basicEffects
-                        service.applyPreset(AuraPreset.builtInPresets[0])
-                    }
-
-                    EffectRowRadio(
-                        title: "RAINBOW",
-                        subtitle: "Dynamic rolling gradient",
-                        isSelected: isCurrentModeRainbow(),
-                        icon: "rainbow"
-                    ) {
-                        selectedSubTab = .basicEffects
-                        service.applyPreset(AuraPreset.builtInPresets[1])
-                    }
-
-                    EffectRowRadio(
-                        title: "STROBING",
-                        subtitle: "High-energy RGB pulse",
-                        isSelected: isCurrentModeStrobing(),
-                        icon: "bolt.fill"
-                    ) {
-                        selectedSubTab = .basicEffects
-                        service.applyPreset(AuraPreset.builtInPresets[11])
-                    }
-                }
-            }
-            .padding(10)
-            .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
-            .cornerRadius(8)
-
-            // 3. Animation Speed (Tempo)
-            VStack(alignment: .leading, spacing: 6) {
-                Text("[ TEMPO ]")
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundColor(.secondary)
-
-                HStack(spacing: 6) {
-                    TempoPillButton(title: "SLOW", isSelected: service.currentSpeed == .slow) {
-                        service.setSpeed(.slow)
-                    }
-                    TempoPillButton(title: "MEDIUM", isSelected: service.currentSpeed == .medium) {
-                        service.setSpeed(.medium)
-                    }
-                    TempoPillButton(title: "FAST", isSelected: service.currentSpeed == .fast) {
-                        service.setSpeed(.fast)
-                    }
-                }
-            }
-            .padding(10)
-            .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
-            .cornerRadius(8)
+    var body: some View {
+        HStack(spacing: 12) {
+            QuickPaletteDots(selectedColor: $selectedColor, onSelect: onColorChanged)
 
             Spacer()
 
-            // 4. Prominent Red Apply Button (Exact Windows Homage)
-            Button(action: onApply) {
-                HStack(spacing: 6) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 12, weight: .bold))
-                    Text("APPLY")
-                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+            // Hex input
+            HStack(spacing: 4) {
+                Text("#")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(.secondary)
+
+                TextField("RRGGBB", text: $hexInputText)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .font(.system(size: 11, design: .monospaced))
+                    .frame(width: 72)
+                    .onChange(of: hexInputText) { text in
+                        let clean = text.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+                        if clean.count == 6, let c = RGBColor(hex: clean) {
+                            onColorChanged(c)
+                        }
+                    }
+                    .onSubmit {
+                        if let c = RGBColor(hex: hexInputText) {
+                            onColorChanged(c)
+                        }
+                    }
+            }
+
+            // macOS Color Wheel button
+            Button(action: {
+                NSColorPanel.shared.orderFront(nil)
+            }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "paintpalette.fill")
+                    Text("Wheel")
                 }
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.red)
-                )
-                .shadow(color: Color.red.opacity(0.35), radius: 6, x: 0, y: 2)
+                .font(.system(size: 11, weight: .medium))
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
+                .background(Color(NSColor.controlColor).opacity(0.8))
+                .cornerRadius(ROGRadius.control)
             }
             .buttonStyle(PlainButtonStyle())
         }
     }
+}
 
-    private func isCurrentModeStatic() -> Bool {
-        if case .singleStatic = service.currentMode { return true }
-        if case .multiStatic = service.currentMode { return true }
-        return false
-    }
+struct QuickPaletteDots: View {
+    @Binding var selectedColor: RGBColor
+    let onSelect: (RGBColor) -> Void
 
-    private func isCurrentModeBreathing() -> Bool {
-        if case .singleBreathing = service.currentMode { return true }
-        if case .multiBreathing = service.currentMode { return true }
-        return false
-    }
+    private static let swatches: [RGBColor] = [
+        .rogRed,
+        RGBColor(red: 255, green: 102, blue: 0),   // Orange
+        RGBColor(red: 255, green: 204, blue: 0),   // Yellow
+        RGBColor(red: 0, green: 220, blue: 90),    // Green
+        RGBColor(red: 0, green: 220, blue: 255),   // Cyan
+        RGBColor(red: 0, green: 122, blue: 255),   // Blue
+        RGBColor(red: 175, green: 82, blue: 222),  // Purple
+        .white
+    ]
 
-    private func isCurrentModeColorCycle() -> Bool {
-        if case .colorCycle = service.currentMode { return true }
-        return false
-    }
-
-    private func isCurrentModeRainbow() -> Bool {
-        if case .rainbow = service.currentMode { return true }
-        return false
-    }
-
-    private func isCurrentModeStrobing() -> Bool {
-        if case .strobing = service.currentMode { return true }
-        return false
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(Self.swatches, id: \.self) { c in
+                Button(action: {
+                    selectedColor = c
+                    onSelect(c)
+                }) {
+                    Circle()
+                        .fill(Color(rgb: c))
+                        .frame(width: 18, height: 18)
+                        .overlay(
+                            Circle()
+                                .stroke(selectedColor == c ? Color.white : Color.white.opacity(0.2), lineWidth: selectedColor == c ? 2.0 : 0.5)
+                        )
+                        .shadow(color: selectedColor == c ? Color(rgb: c).opacity(0.5) : .clear, radius: 4)
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+        }
     }
 }
 
-// MARK: - Control Buttons
+// MARK: - Themes Grid
 
-struct BrightnessSegmentButton: View {
+struct ThemesGrid: View {
+    let onThemeSelected: (AuraPreset) -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(AuraPreset.builtInPresets.prefix(5)) { preset in
+                Button(action: { onThemeSelected(preset) }) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 3) {
+                            ForEach(0..<min(4, preset.previewColors.count), id: \.self) { i in
+                                Circle()
+                                    .fill(Color(rgb: preset.previewColors[i]))
+                                    .frame(width: 7, height: 7)
+                            }
+                        }
+                        Text(preset.name)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+                    }
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 7)
+                    .background(Color(NSColor.controlBackgroundColor).opacity(0.6))
+                    .cornerRadius(ROGRadius.control)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: ROGRadius.control)
+                            .stroke(ROGColor.hairline, lineWidth: 0.5)
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+        }
+    }
+}
+
+// MARK: - Hardware Control Pills
+
+struct BrightnessPill: View {
     let title: String
     let isSelected: Bool
     let action: () -> Void
@@ -637,64 +1206,20 @@ struct BrightnessSegmentButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 10, weight: isSelected ? .bold : .regular, design: .monospaced))
+                .font(.system(size: 10, weight: isSelected ? .bold : .regular))
                 .foregroundColor(isSelected ? .white : .secondary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 5)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
                 .background(
-                    RoundedRectangle(cornerRadius: 5)
-                        .fill(isSelected ? Color.blue : Color(NSColor.controlColor).opacity(0.6))
+                    RoundedRectangle(cornerRadius: ROGRadius.control, style: .continuous)
+                        .fill(isSelected ? ROGColor.accent : Color(NSColor.controlColor).opacity(0.5))
                 )
         }
         .buttonStyle(PlainButtonStyle())
     }
 }
 
-struct EffectRowRadio: View {
-    let title: String
-    let subtitle: String
-    let isSelected: Bool
-    let icon: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(isSelected ? .red : .secondary)
-
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(title)
-                        .font(.system(size: 11, weight: isSelected ? .bold : .medium, design: .monospaced))
-                        .foregroundColor(isSelected ? .primary : .secondary)
-                    Text(subtitle)
-                        .font(.system(size: 8.5))
-                        .foregroundColor(.secondary)
-                }
-
-                Spacer()
-
-                Image(systemName: icon)
-                    .font(.system(size: 10))
-                    .foregroundColor(isSelected ? .red : .secondary.opacity(0.6))
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(isSelected ? Color.red.opacity(0.12) : Color.clear)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 6)
-                    .stroke(isSelected ? Color.red.opacity(0.4) : Color.clear, lineWidth: 0.5)
-            )
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-}
-
-struct TempoPillButton: View {
+struct TempoSegmentPill: View {
     let title: String
     let isSelected: Bool
     let action: () -> Void
@@ -702,13 +1227,13 @@ struct TempoPillButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 10, weight: isSelected ? .bold : .regular, design: .monospaced))
+                .font(.system(size: 10, weight: isSelected ? .bold : .regular))
                 .foregroundColor(isSelected ? .white : .secondary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 5)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
                 .background(
-                    RoundedRectangle(cornerRadius: 5)
-                        .fill(isSelected ? Color.red : Color(NSColor.controlColor).opacity(0.6))
+                    RoundedRectangle(cornerRadius: ROGRadius.control, style: .continuous)
+                        .fill(isSelected ? ROGColor.accent : Color(NSColor.controlColor).opacity(0.5))
                 )
         }
         .buttonStyle(PlainButtonStyle())
