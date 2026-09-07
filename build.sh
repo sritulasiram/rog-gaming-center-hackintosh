@@ -164,6 +164,8 @@ if [ "$1" == "--install" ]; then
     echo "-> Installing application to /Applications/$APP_NAME.app..."
     rm -rf "/Applications/$APP_NAME.app"
     cp -R "$APP_BUNDLE" "/Applications/$APP_NAME.app"
+    touch "/Applications/$APP_NAME.app"
+    /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "/Applications/$APP_NAME.app" 2>/dev/null || true
     
     if [ -w "/usr/local/bin" ]; then
         echo "-> Installing CLI binary to /usr/local/bin/rogauracore..."
