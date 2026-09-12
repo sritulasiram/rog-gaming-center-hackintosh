@@ -125,6 +125,7 @@ public final class TelemetryService: ObservableObject {
 
     private init() {
         checkAsusSMCSupport()
+        loadPersistedBatteryLimit()
         fetchSystemSpecs()
         refreshTelemetry()
         startPolling()
@@ -138,6 +139,17 @@ public final class TelemetryService: ObservableObject {
         var size: size_t = 0
         let res = sysctlbyname("hw.asus.battery.charging_threshold", nil, &size, nil, 0)
         isAsusSMCChargeLimitSupported = (res == 0)
+    }
+
+    private func loadPersistedBatteryLimit() {
+        let saved = UserDefaults.standard.integer(forKey: "Aura_BatteryChargeLimit")
+        if saved == 60 || saved == 80 || saved == 100 {
+            self.batteryChargeLimit = saved
+            if isAsusSMCChargeLimitSupported {
+                var val = Int32(saved)
+                _ = sysctlbyname("hw.asus.battery.charging_threshold", nil, nil, &val, MemoryLayout<Int32>.size)
+            }
+        }
     }
 
     public func startPolling() {

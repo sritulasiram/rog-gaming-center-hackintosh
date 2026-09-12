@@ -37,20 +37,14 @@ public struct AuraPopoverView: View {
                             .font(.system(size: 12, weight: .bold))
                             .foregroundColor(.primary)
 
-                        HStack(spacing: 4) {
-                            Circle()
-                                .fill(service.isConnected ? Color.green : Color.orange)
-                                .frame(width: 5, height: 5)
-
-                            Text(service.isConnected ? "Hardware Online • ITE 8910" : "Controller Standby")
-                                .font(.system(size: 9, weight: .medium))
-                                .foregroundColor(.secondary)
-                        }
+                        Text("Hardware Backlight & Telemetry")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundColor(.secondary)
                     }
 
                     Spacer()
 
-                    // Sleek Circular Liquid Power Orb (No Clunky Box)
+                    // Sleek Circular Liquid Power Orb (No Clunky Box, No Blue Focus Ring)
                     Button(action: {
                         withAnimation(.easeInOut(duration: 0.15)) {
                             service.togglePower()
@@ -67,6 +61,7 @@ public struct AuraPopoverView: View {
                         }
                     }
                     .buttonStyle(PlainButtonStyle())
+                    .focusable(false)
                     .help("Toggle Backlight Power")
                 }
 
@@ -249,6 +244,7 @@ public struct AuraPopoverView: View {
                         .foregroundColor(.blue)
                     }
                     .buttonStyle(PlainButtonStyle())
+                    .focusable(false)
 
                     Spacer()
 
@@ -263,6 +259,7 @@ public struct AuraPopoverView: View {
                         .foregroundColor(.primary)
                     }
                     .buttonStyle(PlainButtonStyle())
+                    .focusable(false)
                 }
             }
             .padding(12)

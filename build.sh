@@ -65,6 +65,12 @@ fi
 if [ -f "./Resources/logo.png" ]; then
     cp ./Resources/logo.png "$RESOURCES/logo.png"
 fi
+if [ -f "./Resources/rog_logo_white.png" ]; then
+    cp ./Resources/rog_logo_white.png "$RESOURCES/rog_logo_white.png"
+fi
+if [ -f "./Resources/rog_emblem_white.svg" ]; then
+    cp ./Resources/rog_emblem_white.svg "$RESOURCES/rog_emblem_white.svg"
+fi
 
 # 4. Generate Info.plist
 cat << EOF > "$CONTENTS/Info.plist"

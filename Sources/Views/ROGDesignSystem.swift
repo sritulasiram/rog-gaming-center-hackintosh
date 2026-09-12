@@ -175,3 +175,174 @@ public struct LabeledRow: View {
         }
     }
 }
+
+// MARK: - Apple Bento Card Surface
+
+public struct AppleBentoCard<Content: View>: View {
+    public var radius: CGFloat = ROGRadius.card
+    public var padding: CGFloat = 16
+    public let content: Content
+
+    public init(radius: CGFloat = ROGRadius.card, padding: CGFloat = 16, @ViewBuilder content: () -> Content) {
+        self.radius = radius
+        self.padding = padding
+        self.content = content()
+    }
+
+    public var body: some View {
+        content
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(padding)
+            .background(
+                ZStack {
+                    VisualEffectBackground(material: .contentBackground, blendingMode: .withinWindow)
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.08), Color.white.opacity(0.01)],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                }
+                .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .stroke(ROGColor.hairline, lineWidth: 0.6)
+            )
+            .shadow(color: .black.opacity(0.16), radius: 10, y: 5)
+    }
+}
+
+// MARK: - Apple Activity-Style Telemetry Ring
+
+public struct ActivityRing: View {
+    public var progress: Double // 0.0 ... 1.0
+    public var ringWidth: CGFloat
+    public var gradientColors: [Color]
+    public var backgroundColor: Color
+
+    public init(
+        progress: Double,
+        ringWidth: CGFloat = 8,
+        gradientColors: [Color],
+        backgroundColor: Color = Color.secondary.opacity(0.18)
+    ) {
+        self.progress = min(1.0, max(0.0, progress))
+        self.ringWidth = ringWidth
+        self.gradientColors = gradientColors
+        self.backgroundColor = backgroundColor
+    }
+
+    public var body: some View {
+        ZStack {
+            Circle()
+                .stroke(backgroundColor, lineWidth: ringWidth)
+
+            Circle()
+                .trim(from: 0.0, to: CGFloat(progress))
+                .stroke(
+                    AngularGradient(
+                        gradient: Gradient(colors: gradientColors),
+                        center: .center,
+                        startAngle: .degrees(-90),
+                        endAngle: .degrees(270)
+                    ),
+                    style: StrokeStyle(lineWidth: ringWidth, lineCap: .round)
+                )
+                .rotationEffect(.degrees(-90))
+        }
+    }
+}
+
+// MARK: - Apple Grouped Settings Container & Row
+
+public struct AppleGroupedBox<Content: View>: View {
+    public let content: Content
+
+    public init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    public var body: some View {
+        VStack(spacing: 0) {
+            content
+        }
+        .background(Color(NSColor.controlBackgroundColor).opacity(0.42))
+        .clipShape(RoundedRectangle(cornerRadius: ROGRadius.tile, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: ROGRadius.tile, style: .continuous)
+                .stroke(ROGColor.hairline, lineWidth: 0.6)
+        )
+    }
+}
+
+public struct SettingsRowView<TrailingContent: View>: View {
+    let icon: String
+    var iconColor: Color
+    let title: String
+    var subtitle: String?
+    let trailing: TrailingContent
+
+    public init(
+        icon: String,
+        iconColor: Color = .secondary,
+        title: String,
+        subtitle: String? = nil,
+        @ViewBuilder trailing: () -> TrailingContent
+    ) {
+        self.icon = icon
+        self.iconColor = iconColor
+        self.title = title
+        self.subtitle = subtitle
+        self.trailing = trailing()
+    }
+
+    public var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(iconColor)
+                .frame(width: 22, height: 22)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(ROGType.bodyEmphasized())
+                    .foregroundStyle(.primary)
+
+                if let subtitle {
+                    Text(subtitle)
+                        .font(ROGType.caption())
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            Spacer(minLength: 16)
+
+            trailing
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+    }
+}
+
+public struct KeyCapBadge: View {
+    let label: String
+
+    public init(_ label: String) {
+        self.label = label
+    }
+
+    public var body: some View {
+        Text(label)
+            .font(.system(size: 10.5, weight: .medium, design: .rounded))
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3.5)
+            .background(Color(NSColor.controlColor).opacity(0.85))
+            .clipShape(RoundedRectangle(cornerRadius: ROGRadius.control, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: ROGRadius.control, style: .continuous)
+                    .stroke(ROGColor.hairline, lineWidth: 0.5)
+            )
+    }
+}
+
