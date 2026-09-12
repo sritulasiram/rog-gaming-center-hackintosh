@@ -64,6 +64,15 @@ public final class AuraService: ObservableObject {
         RGBColor(red: 0, green: 127, blue: 255)    // Numpad
     ]
     @Published public var customPresets: [AuraPreset] = []
+
+    public var allPresets: [AuraPreset] {
+        AuraPreset.builtInPresets + customPresets
+    }
+
+    public var activePresetName: String {
+        allPresets.first(where: { $0.id == activePresetId })?.name
+            ?? activePresetId.capitalized.replacingOccurrences(of: "_", with: " ")
+    }
     @Published public var isLaunchAtLoginEnabled: Bool = false
     @Published public var isCloseToTrayEnabled: Bool = true
     @Published public var isROGKeyEnabled: Bool = true
@@ -278,8 +287,6 @@ public final class AuraService: ObservableObject {
         }
     }
 
-    @Published public var isTouchpadEnabled: Bool = true
-
     @discardableResult
     private func handleKeyEvent(_ event: NSEvent) -> Bool {
         guard event.type == .keyDown else { return false }
@@ -317,12 +324,8 @@ public final class AuraService: ObservableObject {
             DispatchQueue.main.async { [weak self] in self?.togglePower() }
             return true
 
-        case 97: // F6 -> Touchpad Toggle
-            DispatchQueue.main.async { [weak self] in
-                guard let self = self else { return }
-                self.isTouchpadEnabled.toggle()
-            }
-            return true
+        case 97: // F6 -> Touchpad Toggle (Handled at hardware/ACPI level by VoodooI2C)
+            return false
 
         case 122: // F1 -> Audio Mute
             DispatchQueue.main.async {

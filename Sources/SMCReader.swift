@@ -51,6 +51,8 @@ public final class SMCReader {
 
     private let queue = DispatchQueue(label: "com.asus.roggamingcenter.smc", qos: .utility)
     private var connection: io_connect_t = 0
+    private var lastConnectionAttempt: Date = .distantPast
+    private let connectionRetryInterval: TimeInterval = 30.0
     public private(set) var isAvailable: Bool = false
 
     private init() {
@@ -62,6 +64,12 @@ public final class SMCReader {
     }
 
     private func openConnection() {
+        let now = Date()
+        guard now.timeIntervalSince(lastConnectionAttempt) >= connectionRetryInterval else {
+            return
+        }
+        lastConnectionAttempt = now
+
         let mainPort: mach_port_t
         if #available(macOS 12.0, *) {
             mainPort = kIOMainPortDefault

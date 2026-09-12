@@ -84,13 +84,7 @@ public struct AuraStudioView: View {
     public var body: some View {
         ScrollView(.vertical, showsIndicators: true) {
             VStack(spacing: 16) {
-                // 1. Studio Header & Hardware Status
-                AuraStudioHeader(
-                    showAppliedBanner: showAppliedBanner,
-                    onPowerToggle: { service.togglePower() }
-                )
-
-                // 2. Seamless Full-Width Keyboard Deck (No artificial zone dividers)
+                // 1. Seamless Full-Width Keyboard Deck (No artificial zone dividers)
                 AuraSeamlessKeyboardDeck(
                     selectedEffect: selectedEffect,
                     activeColor: selectedColor,
@@ -262,77 +256,6 @@ public struct AuraStudioView: View {
     }
 }
 
-// MARK: - 1. Studio Header
-
-struct AuraStudioHeader: View {
-    @ObservedObject var service = AuraService.shared
-    let showAppliedBanner: Bool
-    let onPowerToggle: () -> Void
-
-    var body: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .fill(ROGColor.accent.opacity(0.15))
-                    .frame(width: 44, height: 44)
-
-                Image(systemName: "sparkles")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(ROGColor.accent)
-            }
-
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 8) {
-                    Text("Aura Core")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundColor(.primary)
-
-                    AccentBadge(service.isPoweredOn ? "Backlight Active" : "Backlight Off", color: service.isPoweredOn ? ROGColor.good : .secondary)
-                }
-
-                Text("ASUS ROG Strix GL503 / SCAR Hardware Backlight Studio")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-            }
-
-            Spacer()
-
-            if showAppliedBanner {
-                HStack(spacing: 5) {
-                    Image(systemName: "checkmark.circle.fill")
-                    Text("Applied to Hardware")
-                }
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(ROGColor.good)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(ROGColor.good.opacity(0.12))
-                .cornerRadius(ROGRadius.control)
-                .transition(.opacity)
-            }
-
-            // Power Toggle Button
-            Button(action: onPowerToggle) {
-                HStack(spacing: 6) {
-                    Image(systemName: service.isPoweredOn ? "power" : "power.circle")
-                        .font(.system(size: 12, weight: .bold))
-                    Text(service.isPoweredOn ? "Power On" : "Power Off")
-                        .font(.system(size: 11, weight: .medium))
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(service.isPoweredOn ? ROGColor.good.opacity(0.16) : Color(NSColor.controlColor).opacity(0.6))
-                .foregroundColor(service.isPoweredOn ? ROGColor.good : .secondary)
-                .cornerRadius(ROGRadius.control)
-                .overlay(
-                    RoundedRectangle(cornerRadius: ROGRadius.control)
-                        .stroke(service.isPoweredOn ? ROGColor.good.opacity(0.4) : ROGColor.hairline, lineWidth: 0.5)
-                )
-            }
-            .buttonStyle(PlainButtonStyle())
-        }
-    }
-}
 
 // MARK: - 2. Seamless Keyboard Deck
 
@@ -346,192 +269,190 @@ struct AuraSeamlessKeyboardDeck: View {
     private let dynamicTimer = Timer.publish(every: 0.08, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // Dedicated Top Hotkeys Row
-            HStack(spacing: 8) {
-                KeyboardHotkeyPill(title: "VOL -", icon: "speaker.minus")
-                KeyboardHotkeyPill(title: "VOL +", icon: "speaker.plus")
-                KeyboardHotkeyPill(title: "MIC MUTE", icon: "mic.slash")
-                KeyboardHotkeyPill(title: "ROG", icon: "flame.fill", isAccent: true)
+        VStack(spacing: 12) {
+            // Centered Keyboard Deck Container
+            VStack(alignment: .center, spacing: 10) {
+                // Dedicated Top Hotkeys Row (Centered with keyboard)
+                HStack(spacing: 8) {
+                    KeyboardHotkeyPill(title: "VOL -", icon: "speaker.minus")
+                    KeyboardHotkeyPill(title: "VOL +", icon: "speaker.plus")
+                    KeyboardHotkeyPill(title: "MIC MUTE", icon: "mic.slash")
+                    KeyboardHotkeyPill(title: "ROG", icon: "flame.fill", isAccent: true)
 
-                Spacer()
-
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(service.isConnected ? ROGColor.good : ROGColor.warn)
-                        .frame(width: 6, height: 6)
-                    Text(service.isConnected ? "ITE 8910 Latched" : "Controller Standby")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(.secondary)
-                }
-            }
-            .padding(.horizontal, 4)
-
-            // The Seamless Laptop Keyboard Matrix
-            VStack(spacing: 4) {
-                // Function Row (Esc, F1-F12, Del, PrtSc, Pause)
-                HStack(spacing: 3) {
-                    Keycap(label: "ESC", width: 28, color: keyColor(xFraction: 0.02))
-                    Spacer().frame(width: 6)
-                    Keycap(label: "F1", width: 22, color: keyColor(xFraction: 0.08))
-                    Keycap(label: "F2", width: 22, color: keyColor(xFraction: 0.12))
-                    Keycap(label: "F3", width: 22, color: keyColor(xFraction: 0.16))
-                    Keycap(label: "F4", width: 22, color: keyColor(xFraction: 0.20))
-                    Spacer().frame(width: 6)
-                    Keycap(label: "F5", width: 22, color: keyColor(xFraction: 0.28))
-                    Keycap(label: "F6", width: 22, color: keyColor(xFraction: 0.32))
-                    Keycap(label: "F7", width: 22, color: keyColor(xFraction: 0.36))
-                    Keycap(label: "F8", width: 22, color: keyColor(xFraction: 0.40))
-                    Spacer().frame(width: 6)
-                    Keycap(label: "F9", width: 22, color: keyColor(xFraction: 0.48))
-                    Keycap(label: "F10", width: 22, color: keyColor(xFraction: 0.52))
-                    Keycap(label: "F11", width: 22, color: keyColor(xFraction: 0.56))
-                    Keycap(label: "F12", width: 22, color: keyColor(xFraction: 0.60))
-                    Spacer().frame(width: 8)
-                    Keycap(label: "DEL", width: 24, color: keyColor(xFraction: 0.72))
-                    Keycap(label: "PRT", width: 24, color: keyColor(xFraction: 0.78))
-                    Keycap(label: "PAU", width: 24, color: keyColor(xFraction: 0.84))
                     Spacer()
                 }
+                .frame(width: 630)
 
-                // Number Row (`~` through Backspace, plus Numpad Top)
-                HStack(spacing: 3) {
-                    Keycap(label: "~", width: 22, color: keyColor(xFraction: 0.02))
-                    Keycap(label: "1", width: 22, color: keyColor(xFraction: 0.06))
-                    Keycap(label: "2", width: 22, color: keyColor(xFraction: 0.10))
-                    Keycap(label: "3", width: 22, color: keyColor(xFraction: 0.14))
-                    Keycap(label: "4", width: 22, color: keyColor(xFraction: 0.18))
-                    Keycap(label: "5", width: 22, color: keyColor(xFraction: 0.22))
-                    Keycap(label: "6", width: 22, color: keyColor(xFraction: 0.26))
-                    Keycap(label: "7", width: 22, color: keyColor(xFraction: 0.30))
-                    Keycap(label: "8", width: 22, color: keyColor(xFraction: 0.34))
-                    Keycap(label: "9", width: 22, color: keyColor(xFraction: 0.38))
-                    Keycap(label: "0", width: 22, color: keyColor(xFraction: 0.42))
-                    Keycap(label: "-", width: 22, color: keyColor(xFraction: 0.46))
-                    Keycap(label: "=", width: 22, color: keyColor(xFraction: 0.50))
-                    Keycap(label: "BKSP", width: 44, color: keyColor(xFraction: 0.58))
-                    Spacer().frame(width: 8)
-                    Keycap(label: "NUM", width: 24, color: keyColor(xFraction: 0.74))
-                    Keycap(label: "/", width: 24, color: keyColor(xFraction: 0.80))
-                    Keycap(label: "*", width: 24, color: keyColor(xFraction: 0.86))
-                    Keycap(label: "-", width: 24, color: keyColor(xFraction: 0.92))
-                    Spacer()
-                }
-
-                // QWERTY Row (Tab 1.5u, Q..P, [, ], \, Numpad 789+)
-                HStack(spacing: 3) {
-                    Keycap(label: "TAB", width: 34, color: keyColor(xFraction: 0.03))
-                    Keycap(label: "Q", width: 22, color: keyColor(xFraction: 0.08))
-                    Keycap(label: "W", width: 22, color: keyColor(xFraction: 0.12), isWASD: true)
-                    Keycap(label: "E", width: 22, color: keyColor(xFraction: 0.16))
-                    Keycap(label: "R", width: 22, color: keyColor(xFraction: 0.20))
-                    Keycap(label: "T", width: 22, color: keyColor(xFraction: 0.24))
-                    Keycap(label: "Y", width: 22, color: keyColor(xFraction: 0.28))
-                    Keycap(label: "U", width: 22, color: keyColor(xFraction: 0.32))
-                    Keycap(label: "I", width: 22, color: keyColor(xFraction: 0.36))
-                    Keycap(label: "O", width: 22, color: keyColor(xFraction: 0.40))
-                    Keycap(label: "P", width: 22, color: keyColor(xFraction: 0.44))
-                    Keycap(label: "[", width: 22, color: keyColor(xFraction: 0.48))
-                    Keycap(label: "]", width: 22, color: keyColor(xFraction: 0.52))
-                    Keycap(label: "\\", width: 32, color: keyColor(xFraction: 0.58))
-                    Spacer().frame(width: 8)
-                    Keycap(label: "7", width: 24, color: keyColor(xFraction: 0.74))
-                    Keycap(label: "8", width: 24, color: keyColor(xFraction: 0.80))
-                    Keycap(label: "9", width: 24, color: keyColor(xFraction: 0.86))
-                    Keycap(label: "+", width: 24, color: keyColor(xFraction: 0.92))
-                    Spacer()
-                }
-
-                // Home Row (Caps 1.75u, A..L, ;, ', Enter 2.25u, Numpad 456)
-                HStack(spacing: 3) {
-                    Keycap(label: "CAPS", width: 40, color: keyColor(xFraction: 0.04))
-                    Keycap(label: "A", width: 22, color: keyColor(xFraction: 0.10), isWASD: true)
-                    Keycap(label: "S", width: 22, color: keyColor(xFraction: 0.14), isWASD: true)
-                    Keycap(label: "D", width: 22, color: keyColor(xFraction: 0.18), isWASD: true)
-                    Keycap(label: "F", width: 22, color: keyColor(xFraction: 0.22))
-                    Keycap(label: "G", width: 22, color: keyColor(xFraction: 0.26))
-                    Keycap(label: "H", width: 22, color: keyColor(xFraction: 0.30))
-                    Keycap(label: "J", width: 22, color: keyColor(xFraction: 0.34))
-                    Keycap(label: "K", width: 22, color: keyColor(xFraction: 0.38))
-                    Keycap(label: "L", width: 22, color: keyColor(xFraction: 0.42))
-                    Keycap(label: ";", width: 22, color: keyColor(xFraction: 0.46))
-                    Keycap(label: "'", width: 22, color: keyColor(xFraction: 0.50))
-                    Keycap(label: "ENTER", width: 48, color: keyColor(xFraction: 0.59))
-                    Spacer().frame(width: 8)
-                    Keycap(label: "4", width: 24, color: keyColor(xFraction: 0.74))
-                    Keycap(label: "5", width: 24, color: keyColor(xFraction: 0.80))
-                    Keycap(label: "6", width: 24, color: keyColor(xFraction: 0.86))
-                    Spacer()
-                }
-
-                // Shift Row (L-Shift 2.25u, Z../, R-Shift 1.75u, Numpad 123 Enter)
-                HStack(spacing: 3) {
-                    Keycap(label: "SHIFT", width: 50, color: keyColor(xFraction: 0.05))
-                    Keycap(label: "Z", width: 22, color: keyColor(xFraction: 0.12))
-                    Keycap(label: "X", width: 22, color: keyColor(xFraction: 0.16))
-                    Keycap(label: "C", width: 22, color: keyColor(xFraction: 0.20))
-                    Keycap(label: "V", width: 22, color: keyColor(xFraction: 0.24))
-                    Keycap(label: "B", width: 22, color: keyColor(xFraction: 0.28))
-                    Keycap(label: "N", width: 22, color: keyColor(xFraction: 0.32))
-                    Keycap(label: "M", width: 22, color: keyColor(xFraction: 0.36))
-                    Keycap(label: ",", width: 22, color: keyColor(xFraction: 0.40))
-                    Keycap(label: ".", width: 22, color: keyColor(xFraction: 0.44))
-                    Keycap(label: "/", width: 22, color: keyColor(xFraction: 0.48))
-                    Keycap(label: "SHIFT", width: 38, color: keyColor(xFraction: 0.56))
-                    Spacer().frame(width: 8)
-                    Keycap(label: "1", width: 24, color: keyColor(xFraction: 0.74))
-                    Keycap(label: "2", width: 24, color: keyColor(xFraction: 0.80))
-                    Keycap(label: "3", width: 24, color: keyColor(xFraction: 0.86))
-                    Keycap(label: "ENT", width: 24, color: keyColor(xFraction: 0.92))
-                    Spacer()
-                }
-
-                // Bottom Row (Ctrl, Fn, Opt, Cmd, Spacebar, Cmd, Opt, Arrows, Numpad 0 .)
-                HStack(spacing: 3) {
-                    Keycap(label: "CTRL", width: 26, color: keyColor(xFraction: 0.03))
-                    Keycap(label: "FN", width: 20, color: keyColor(xFraction: 0.07))
-                    Keycap(label: "OPT", width: 20, color: keyColor(xFraction: 0.11))
-                    Keycap(label: "CMD", width: 26, color: keyColor(xFraction: 0.15))
-                    Keycap(label: "SPACEBAR", width: 140, color: keyColor(xFraction: 0.30))
-                    Keycap(label: "CMD", width: 26, color: keyColor(xFraction: 0.46))
-                    Keycap(label: "OPT", width: 20, color: keyColor(xFraction: 0.52))
-                    Spacer().frame(width: 8)
-
-                    // Arrow Cluster (◄, ▼, ► with ▲ placed directly above)
-                    HStack(spacing: 2) {
-                        Keycap(label: "◄", width: 18, color: keyColor(xFraction: 0.65))
-                        VStack(spacing: 2) {
-                            Keycap(label: "▲", width: 18, color: keyColor(xFraction: 0.68))
-                            Keycap(label: "▼", width: 18, color: keyColor(xFraction: 0.68))
-                        }
-                        Keycap(label: "►", width: 18, color: keyColor(xFraction: 0.71))
+                // The Seamless Laptop Keyboard Matrix (Centered, 630pt width)
+                VStack(spacing: 4.5) {
+                    // Function Row (Esc, F1-F12, Del, PrtSc, Pause)
+                    HStack(spacing: 3.5) {
+                        Keycap(label: "ESC", width: 36, color: keyColor(xFraction: 0.02))
+                        Spacer().frame(width: 10)
+                        Keycap(label: "F1", width: 29, color: keyColor(xFraction: 0.08))
+                        Keycap(label: "F2", width: 29, color: keyColor(xFraction: 0.12))
+                        Keycap(label: "F3", width: 29, color: keyColor(xFraction: 0.16))
+                        Keycap(label: "F4", width: 29, color: keyColor(xFraction: 0.20))
+                        Spacer().frame(width: 10)
+                        Keycap(label: "F5", width: 29, color: keyColor(xFraction: 0.28))
+                        Keycap(label: "F6", width: 29, color: keyColor(xFraction: 0.32))
+                        Keycap(label: "F7", width: 29, color: keyColor(xFraction: 0.36))
+                        Keycap(label: "F8", width: 29, color: keyColor(xFraction: 0.40))
+                        Spacer().frame(width: 10)
+                        Keycap(label: "F9", width: 29, color: keyColor(xFraction: 0.48))
+                        Keycap(label: "F10", width: 29, color: keyColor(xFraction: 0.52))
+                        Keycap(label: "F11", width: 29, color: keyColor(xFraction: 0.56))
+                        Keycap(label: "F12", width: 29, color: keyColor(xFraction: 0.60))
+                        Spacer().frame(width: 14)
+                        Keycap(label: "DEL", width: 32, color: keyColor(xFraction: 0.72))
+                        Keycap(label: "PRT", width: 32, color: keyColor(xFraction: 0.78))
+                        Keycap(label: "PAU", width: 32, color: keyColor(xFraction: 0.84))
                     }
+                    .frame(width: 630, alignment: .leading)
 
-                    Spacer().frame(width: 8)
-                    Keycap(label: "0", width: 44, color: keyColor(xFraction: 0.80))
-                    Keycap(label: ".", width: 24, color: keyColor(xFraction: 0.88))
-                    Spacer()
+                    // Number Row (`~` through Backspace, plus Numpad Top)
+                    HStack(spacing: 3.5) {
+                        Keycap(label: "~", width: 30, color: keyColor(xFraction: 0.02))
+                        Keycap(label: "1", width: 30, color: keyColor(xFraction: 0.06))
+                        Keycap(label: "2", width: 30, color: keyColor(xFraction: 0.10))
+                        Keycap(label: "3", width: 30, color: keyColor(xFraction: 0.14))
+                        Keycap(label: "4", width: 30, color: keyColor(xFraction: 0.18))
+                        Keycap(label: "5", width: 30, color: keyColor(xFraction: 0.22))
+                        Keycap(label: "6", width: 30, color: keyColor(xFraction: 0.26))
+                        Keycap(label: "7", width: 30, color: keyColor(xFraction: 0.30))
+                        Keycap(label: "8", width: 30, color: keyColor(xFraction: 0.34))
+                        Keycap(label: "9", width: 30, color: keyColor(xFraction: 0.38))
+                        Keycap(label: "0", width: 30, color: keyColor(xFraction: 0.42))
+                        Keycap(label: "-", width: 30, color: keyColor(xFraction: 0.46))
+                        Keycap(label: "=", width: 30, color: keyColor(xFraction: 0.50))
+                        Keycap(label: "BKSP", width: 54, color: keyColor(xFraction: 0.58))
+                        Spacer().frame(width: 10)
+                        Keycap(label: "NUM", width: 30, color: keyColor(xFraction: 0.74))
+                        Keycap(label: "/", width: 30, color: keyColor(xFraction: 0.80))
+                        Keycap(label: "*", width: 30, color: keyColor(xFraction: 0.86))
+                        Keycap(label: "-", width: 30, color: keyColor(xFraction: 0.92))
+                    }
+                    .frame(width: 630)
+
+                    // QWERTY Row (Tab 1.5u, Q..P, [, ], \, Numpad 789+)
+                    HStack(spacing: 3.5) {
+                        Keycap(label: "TAB", width: 44, color: keyColor(xFraction: 0.03))
+                        Keycap(label: "Q", width: 30, color: keyColor(xFraction: 0.08))
+                        Keycap(label: "W", width: 30, color: keyColor(xFraction: 0.12), isWASD: true)
+                        Keycap(label: "E", width: 30, color: keyColor(xFraction: 0.16))
+                        Keycap(label: "R", width: 30, color: keyColor(xFraction: 0.20))
+                        Keycap(label: "T", width: 30, color: keyColor(xFraction: 0.24))
+                        Keycap(label: "Y", width: 30, color: keyColor(xFraction: 0.28))
+                        Keycap(label: "U", width: 30, color: keyColor(xFraction: 0.32))
+                        Keycap(label: "I", width: 30, color: keyColor(xFraction: 0.36))
+                        Keycap(label: "O", width: 30, color: keyColor(xFraction: 0.40))
+                        Keycap(label: "P", width: 30, color: keyColor(xFraction: 0.44))
+                        Keycap(label: "[", width: 30, color: keyColor(xFraction: 0.48))
+                        Keycap(label: "]", width: 30, color: keyColor(xFraction: 0.52))
+                        Keycap(label: "\\", width: 40, color: keyColor(xFraction: 0.58))
+                        Spacer().frame(width: 10)
+                        Keycap(label: "7", width: 30, color: keyColor(xFraction: 0.74))
+                        Keycap(label: "8", width: 30, color: keyColor(xFraction: 0.80))
+                        Keycap(label: "9", width: 30, color: keyColor(xFraction: 0.86))
+                        Keycap(label: "+", width: 30, color: keyColor(xFraction: 0.92))
+                    }
+                    .frame(width: 630)
+
+                    // Home Row (Caps 1.75u, A..L, ;, ', Enter 2.25u, Numpad 456)
+                    HStack(spacing: 3.5) {
+                        Keycap(label: "CAPS", width: 52, color: keyColor(xFraction: 0.04))
+                        Keycap(label: "A", width: 30, color: keyColor(xFraction: 0.10), isWASD: true)
+                        Keycap(label: "S", width: 30, color: keyColor(xFraction: 0.14), isWASD: true)
+                        Keycap(label: "D", width: 30, color: keyColor(xFraction: 0.18), isWASD: true)
+                        Keycap(label: "F", width: 30, color: keyColor(xFraction: 0.22))
+                        Keycap(label: "G", width: 30, color: keyColor(xFraction: 0.26))
+                        Keycap(label: "H", width: 30, color: keyColor(xFraction: 0.30))
+                        Keycap(label: "J", width: 30, color: keyColor(xFraction: 0.34))
+                        Keycap(label: "K", width: 30, color: keyColor(xFraction: 0.38))
+                        Keycap(label: "L", width: 30, color: keyColor(xFraction: 0.42))
+                        Keycap(label: ";", width: 30, color: keyColor(xFraction: 0.46))
+                        Keycap(label: "'", width: 30, color: keyColor(xFraction: 0.50))
+                        Keycap(label: "ENTER", width: 65.5, color: keyColor(xFraction: 0.59))
+                        Spacer().frame(width: 10)
+                        Keycap(label: "4", width: 30, color: keyColor(xFraction: 0.74))
+                        Keycap(label: "5", width: 30, color: keyColor(xFraction: 0.80))
+                        Keycap(label: "6", width: 30, color: keyColor(xFraction: 0.86))
+                        Keycap(label: "+", width: 30, color: keyColor(xFraction: 0.92))
+                    }
+                    .frame(width: 630)
+
+                    // Shift Row (L-Shift 2.25u, Z../, R-Shift 1.75u, Numpad 123 Enter)
+                    HStack(spacing: 3.5) {
+                        Keycap(label: "SHIFT", width: 76, color: keyColor(xFraction: 0.05))
+                        Keycap(label: "Z", width: 30, color: keyColor(xFraction: 0.12))
+                        Keycap(label: "X", width: 30, color: keyColor(xFraction: 0.16))
+                        Keycap(label: "C", width: 30, color: keyColor(xFraction: 0.20))
+                        Keycap(label: "V", width: 30, color: keyColor(xFraction: 0.24))
+                        Keycap(label: "B", width: 30, color: keyColor(xFraction: 0.28))
+                        Keycap(label: "N", width: 30, color: keyColor(xFraction: 0.32))
+                        Keycap(label: "M", width: 30, color: keyColor(xFraction: 0.36))
+                        Keycap(label: ",", width: 30, color: keyColor(xFraction: 0.40))
+                        Keycap(label: ".", width: 30, color: keyColor(xFraction: 0.44))
+                        Keycap(label: "/", width: 30, color: keyColor(xFraction: 0.48))
+                        Keycap(label: "SHIFT", width: 75, color: keyColor(xFraction: 0.56))
+                        Spacer().frame(width: 10)
+                        Keycap(label: "1", width: 30, color: keyColor(xFraction: 0.74))
+                        Keycap(label: "2", width: 30, color: keyColor(xFraction: 0.80))
+                        Keycap(label: "3", width: 30, color: keyColor(xFraction: 0.86))
+                        Keycap(label: "ENT", width: 30, color: keyColor(xFraction: 0.92))
+                    }
+                    .frame(width: 630)
+
+                    // Bottom Row (Ctrl, Fn, Opt, Cmd, Spacebar, Cmd, Opt, Arrows, Numpad 0 .)
+                    HStack(spacing: 3.5) {
+                        Keycap(label: "CTRL", width: 36, color: keyColor(xFraction: 0.03))
+                        Keycap(label: "FN", width: 26, color: keyColor(xFraction: 0.07))
+                        Keycap(label: "OPT", width: 26, color: keyColor(xFraction: 0.11))
+                        Keycap(label: "CMD", width: 36, color: keyColor(xFraction: 0.15))
+                        Keycap(label: "SPACEBAR", width: 201, color: keyColor(xFraction: 0.30))
+                        Keycap(label: "CMD", width: 36, color: keyColor(xFraction: 0.46))
+                        Keycap(label: "OPT", width: 26, color: keyColor(xFraction: 0.52))
+                        Spacer().frame(width: 8)
+
+                        // Arrow Cluster (◄, ▼, ► with ▲ placed directly above)
+                        HStack(spacing: 2) {
+                            Keycap(label: "◄", width: 24, height: 23, color: keyColor(xFraction: 0.65))
+                            VStack(spacing: 2) {
+                                Keycap(label: "▲", width: 24, height: 10.5, color: keyColor(xFraction: 0.68))
+                                Keycap(label: "▼", width: 24, height: 10.5, color: keyColor(xFraction: 0.68))
+                            }
+                            Keycap(label: "►", width: 24, height: 23, color: keyColor(xFraction: 0.71))
+                        }
+
+                        Spacer().frame(width: 8)
+                        Keycap(label: "0", width: 60, color: keyColor(xFraction: 0.80))
+                        Keycap(label: ".", width: 30, color: keyColor(xFraction: 0.86))
+                        Keycap(label: "ENT", width: 30, color: keyColor(xFraction: 0.92))
+                    }
+                    .frame(width: 630)
                 }
-            }
-            .padding(14)
-            .background(
-                ZStack {
-                    // Under-deck dark chassis
+                .padding(14)
+                .background(
+                    ZStack {
+                        // Under-deck dark chassis
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Color(NSColor.windowBackgroundColor).opacity(0.85))
+
+                        // Diffuse ambient LED underglow layer
+                        underglowLayer
+                            .blur(radius: 20)
+                            .opacity(service.isPoweredOn ? 0.40 : 0.0)
+                    }
+                )
+                .overlay(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color(NSColor.windowBackgroundColor).opacity(0.75))
-
-                    // Diffuse ambient LED underglow layer
-                    underglowLayer
-                        .blur(radius: 16)
-                        .opacity(service.isPoweredOn ? 0.35 : 0.0)
-                }
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(ROGColor.hairline, lineWidth: 0.75)
-            )
+                        .stroke(ROGColor.hairline, lineWidth: 0.75)
+                )
+            }
+            .frame(width: 660)
         }
-        .glassCard(radius: ROGRadius.card, padding: 14)
+        .frame(maxWidth: .infinity, alignment: .center)
+        .glassCard(radius: ROGRadius.card, padding: 16)
         .onReceive(dynamicTimer) { _ in
             guard service.isPoweredOn && selectedEffect != .staticMode else { return }
             animPhase = (animPhase + 0.025).truncatingRemainder(dividingBy: 1.0)
@@ -564,14 +485,12 @@ struct AuraSeamlessKeyboardDeck: View {
             if breathingColor2 != .black && breathingColor2 != activeColor {
                 let c1 = Color(rgb: activeColor)
                 let c2 = Color(rgb: breathingColor2)
-                return wave > 0.5 ? c1.opacity(0.2 + 0.8 * (wave - 0.5) * 2.0) : c2.opacity(0.2 + 0.8 * (0.5 - wave) * 2.0)
-            } else {
-                let c1 = Color(rgb: activeColor)
-                return c1.opacity(0.20 + 0.80 * wave)
+                return wave > 0.5 ? c1 : c2
             }
+            return Color(rgb: activeColor).opacity(0.2 + 0.8 * wave)
 
         case .strobing:
-            let flash = (Int(animPhase * 20) % 2 == 0)
+            let flash = Int(animPhase * 24) % 2 == 0
             if flash {
                 if service.activePresetId == "multi_strobing" {
                     let strobeHue = Double(Int(animPhase * 10) % 8) / 8.0
@@ -620,36 +539,37 @@ struct AuraSeamlessKeyboardDeck: View {
 struct Keycap: View, Equatable {
     let label: String
     let width: CGFloat
+    var height: CGFloat = 23
     let color: Color
     var isWASD: Bool = false
 
     static func == (lhs: Keycap, rhs: Keycap) -> Bool {
-        lhs.label == rhs.label && lhs.width == rhs.width && lhs.color == rhs.color && lhs.isWASD == rhs.isWASD
+        lhs.label == rhs.label && lhs.width == rhs.width && lhs.height == rhs.height && lhs.color == rhs.color && lhs.isWASD == rhs.isWASD
     }
 
     var body: some View {
         ZStack {
             // Keycap body
-            RoundedRectangle(cornerRadius: 3.5, style: .continuous)
+            RoundedRectangle(cornerRadius: 4.0, style: .continuous)
                 .fill(
                     isWASD
-                        ? LinearGradient(colors: [Color.white.opacity(0.9), Color.white.opacity(0.75)], startPoint: .top, endPoint: .bottom)
-                        : LinearGradient(colors: [Color.black.opacity(0.7), Color.black.opacity(0.85)], startPoint: .top, endPoint: .bottom)
+                        ? LinearGradient(colors: [Color.white.opacity(0.95), Color.white.opacity(0.80)], startPoint: .top, endPoint: .bottom)
+                        : LinearGradient(colors: [Color.black.opacity(0.75), Color.black.opacity(0.88)], startPoint: .top, endPoint: .bottom)
                 )
 
             // Inner LED glow bleed
-            RoundedRectangle(cornerRadius: 3.5, style: .continuous)
+            RoundedRectangle(cornerRadius: 4.0, style: .continuous)
                 .fill(color.opacity(isWASD ? 0.85 : 0.45))
 
             // Keycap Legend Text
             Text(label)
-                .font(.system(size: label.count > 3 ? 7.5 : 8.5, weight: isWASD ? .heavy : .bold, design: .rounded))
+                .font(.system(size: label.count > 3 ? 8.5 : 10.0, weight: isWASD ? .heavy : .bold, design: .rounded))
                 .foregroundColor(isWASD ? .black : .white.opacity(0.95))
         }
-        .frame(width: width, height: 19)
+        .frame(width: width, height: height)
         .overlay(
-            RoundedRectangle(cornerRadius: 3.5, style: .continuous)
-                .stroke(isWASD ? ROGColor.accent.opacity(0.7) : color.opacity(0.6), lineWidth: isWASD ? 1.0 : 0.5)
+            RoundedRectangle(cornerRadius: 4.0, style: .continuous)
+                .stroke(isWASD ? ROGColor.accent.opacity(0.85) : color.opacity(0.6), lineWidth: isWASD ? 1.2 : 0.5)
         )
     }
 }
@@ -1162,37 +1082,142 @@ struct QuickPaletteDots: View {
 // MARK: - Themes Grid
 
 struct ThemesGrid: View {
+    @ObservedObject var service = AuraService.shared
     let onThemeSelected: (AuraPreset) -> Void
+
+    @State private var showingSavePopover: Bool = false
+    @State private var customPresetName: String = ""
 
     var body: some View {
         HStack(spacing: 8) {
-            ForEach(AuraPreset.builtInPresets.prefix(5)) { preset in
-                Button(action: { onThemeSelected(preset) }) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 3) {
-                            ForEach(0..<min(4, preset.previewColors.count), id: \.self) { i in
-                                Circle()
-                                    .fill(Color(rgb: preset.previewColors[i]))
-                                    .frame(width: 7, height: 7)
-                            }
-                        }
-                        Text(preset.name)
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundColor(.primary)
-                            .lineLimit(1)
-                    }
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 7)
-                    .background(Color(NSColor.controlBackgroundColor).opacity(0.6))
-                    .cornerRadius(ROGRadius.control)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: ROGRadius.control)
-                            .stroke(ROGColor.hairline, lineWidth: 0.5)
-                    )
+            // Built-in presets
+            ForEach(AuraPreset.builtInPresets) { preset in
+                ThemePillView(
+                    preset: preset,
+                    isSelected: service.activePresetId == preset.id,
+                    onSelect: { onThemeSelected(preset) },
+                    onDelete: nil
+                )
+            }
+
+            // User-created custom presets
+            ForEach(service.customPresets) { preset in
+                ThemePillView(
+                    preset: preset,
+                    isSelected: service.activePresetId == preset.id,
+                    onSelect: { onThemeSelected(preset) },
+                    onDelete: { service.deleteCustomPreset(id: preset.id) }
+                )
+            }
+
+            // Save Current Colors as Custom Preset Button
+            Button(action: {
+                customPresetName = "Custom \(service.customPresets.count + 1)"
+                showingSavePopover = true
+            }) {
+                HStack(spacing: 5) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 11))
+                    Text("Save Theme")
+                        .font(.system(size: 10, weight: .semibold))
                 }
-                .buttonStyle(PlainButtonStyle())
+                .padding(.horizontal, 9)
+                .padding(.vertical, 7)
+                .background(ROGColor.accent.opacity(0.12))
+                .foregroundColor(ROGColor.accent)
+                .cornerRadius(ROGRadius.control)
+                .overlay(
+                    RoundedRectangle(cornerRadius: ROGRadius.control)
+                        .stroke(ROGColor.accent.opacity(0.35), lineWidth: 0.8)
+                )
+            }
+            .buttonStyle(PlainButtonStyle())
+            .popover(isPresented: $showingSavePopover, arrowEdge: .top) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Save Custom Theme")
+                        .font(.system(size: 12, weight: .bold))
+
+                    Text("Saves current 4-zone lighting colors.")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+
+                    TextField("Theme Name", text: $customPresetName)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .font(.system(size: 11))
+                        .frame(width: 190)
+
+                    HStack {
+                        Button("Cancel") {
+                            showingSavePopover = false
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+
+                        Spacer()
+
+                        Button("Save") {
+                            service.saveCustomPreset(name: customPresetName)
+                            showingSavePopover = false
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(ROGColor.accent)
+                    }
+                }
+                .padding(12)
             }
         }
+    }
+}
+
+struct ThemePillView: View {
+    let preset: AuraPreset
+    let isSelected: Bool
+    let onSelect: () -> Void
+    let onDelete: (() -> Void)?
+
+    var body: some View {
+        Button(action: onSelect) {
+            HStack(spacing: 6) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 3) {
+                        ForEach(0..<min(4, preset.previewColors.count), id: \.self) { i in
+                            Circle()
+                                .fill(Color(rgb: preset.previewColors[i]))
+                                .frame(width: 7, height: 7)
+                        }
+                    }
+                    Text(preset.name)
+                        .font(.system(size: 10, weight: isSelected ? .bold : .semibold))
+                        .foregroundColor(isSelected ? .white : .primary)
+                        .lineLimit(1)
+                }
+
+                if let onDelete = onDelete {
+                    Button(action: onDelete) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 11))
+                            .foregroundColor(isSelected ? .white.opacity(0.85) : .secondary)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .help("Delete custom preset")
+                }
+            }
+            .padding(.horizontal, 9)
+            .padding(.vertical, 7)
+            .background(
+                isSelected ?
+                    ROGColor.accent.opacity(0.85) :
+                    Color(NSColor.controlBackgroundColor).opacity(0.6)
+            )
+            .cornerRadius(ROGRadius.control)
+            .overlay(
+                RoundedRectangle(cornerRadius: ROGRadius.control)
+                    .stroke(isSelected ? ROGColor.accent : ROGColor.hairline, lineWidth: isSelected ? 1 : 0.5)
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 

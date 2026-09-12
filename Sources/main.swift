@@ -27,7 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         // 4. Configure Companion Popover
         popover = NSPopover()
-        popover.contentSize = NSSize(width: 290, height: 320)
+        popover.contentSize = NSSize(width: 290, height: 350)
         popover.behavior = .transient
         popover.animates = true
         popover.contentViewController = NSHostingController(rootView: AuraPopoverView())
@@ -66,7 +66,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         window.title = "ROG Gaming Center"
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
-        window.isMovableByWindowBackground = true
+        window.isMovableByWindowBackground = false
         window.minSize = NSSize(width: 900, height: 600)
         window.contentViewController = NSHostingController(rootView: MainWindowView())
         window.delegate = self
@@ -110,9 +110,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             sender.orderOut(nil)
             return false
         } else {
+            DisplayCalibrationService.shared.restoreBaseline()
             NSApp.terminate(nil)
             return true
         }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        DisplayCalibrationService.shared.restoreBaseline()
     }
 
     // MARK: - Menu Bar Status Item & Companion
@@ -123,15 +128,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             button.toolTip = "ROG Gaming Center & Aura Core"
             
             var menubarImg: NSImage?
-            if let iconPath = Bundle.main.path(forResource: "menubar_icon", ofType: "png"),
+            if let iconPath = Bundle.main.path(forResource: "rog_emblem_white", ofType: "svg") ?? Bundle.main.path(forResource: "menubar_icon", ofType: "png") ?? Bundle.main.path(forResource: "rog_logo_white", ofType: "png"),
                let img = NSImage(contentsOfFile: iconPath) {
                 menubarImg = img
-            } else if let img = NSImage(contentsOfFile: "./Resources/menubar_icon.png") {
+            } else if let img = NSImage(contentsOfFile: "./Resources/rog_emblem_white.svg") ?? NSImage(contentsOfFile: "./Resources/menubar_icon.png") ?? NSImage(contentsOfFile: "./Resources/rog_logo_white.png") {
                 menubarImg = img
             }
             
             if let img = menubarImg {
-                img.size = NSSize(width: 22, height: 15)
+                img.size = NSSize(width: 22, height: 13.2)
                 img.isTemplate = true
                 button.image = img
                 button.imagePosition = .imageOnly

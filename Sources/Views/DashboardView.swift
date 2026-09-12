@@ -1,6 +1,8 @@
 import SwiftUI
 import AppKit
 
+// MARK: - Dashboard 2.0: Apple macOS Bento Grid
+
 public struct DashboardView: View {
     @ObservedObject var service = AuraService.shared
     @ObservedObject var telemetry = TelemetryService.shared
@@ -9,39 +11,143 @@ public struct DashboardView: View {
 
     public var body: some View {
         VStack(spacing: 14) {
-            // 3-Column Command Stage (Homage to Windows ROG Gaming Center)
-            HStack(alignment: .top, spacing: 14) {
-                // LEFT COLUMN: Hardware Specification & Battery
-                VStack(spacing: 12) {
-                    SystemArchitectureCard()
-                    BatteryTelemetryCard()
-                }
-                .frame(maxWidth: .infinity)
+            // ROW 1: System Architecture & Silicon Vitality (Equal Height)
+            HStack(spacing: 14) {
+                SystemArchitectureBentoCard()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                // CENTER COLUMN: Silicon Thermal Stage (Hero die temp, headroom, EC phase, sparkline)
-                SiliconThermalStageCard()
-                    .frame(maxWidth: .infinity)
-
-                // RIGHT COLUMN: Dual Glowing Circular Dials (CPU Load & RAM)
-                CircularGaugesCard()
-                    .frame(width: 240)
+                SiliconVitalityBentoCard()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            Spacer()
+            // ROW 2: Silicon Thermals & Hardware Quick Controls (Equal Height)
+            HStack(spacing: 14) {
+                ThermalEngineBentoCard()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            // BOTTOM TRAY: Quick Hardware Controls (Windows Bottom Dock Homage - Real Controls Only)
-            QuickHardwareDock()
+                QuickHardwareControlsBentoCard()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .padding(.horizontal, 18)
-        .padding(.top, 4)
-        .padding(.bottom, 14)
+        .padding(18)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
-// MARK: - Column 1: System Architecture
+// MARK: - 1. Thermal Engine Bento Card (Top-Left)
 
-struct SystemArchitectureCard: View {
+struct ThermalEngineBentoCard: View {
+    @ObservedObject var telemetry = TelemetryService.shared
+
+    private var dieTempColor: Color {
+        let temp = telemetry.fan.cpuTempCelsius
+        if temp < 55 { return ROGColor.good }
+        if temp < 75 { return ROGColor.warn }
+        return ROGColor.bad
+    }
+
+    var body: some View {
+        AppleBentoCard(padding: 16) {
+            VStack(alignment: .leading, spacing: 12) {
+                // Section Header
+                HStack {
+                    SectionLabel("Silicon Thermal Engine", systemImage: "thermometer.sun.fill")
+                    Spacer()
+                    AccentBadge("Autonomous EC", color: ROGColor.info)
+                }
+
+                // Dual Hero Readout (Silicon Die & Thermal Headroom)
+                HStack(spacing: 16) {
+                    // Die Temperature
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Silicon Die Temperature")
+                            .font(ROGType.caption())
+                            .foregroundStyle(.secondary)
+
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Text("\(telemetry.fan.cpuTempCelsius)°C")
+                                .font(ROGType.heroNumber())
+                                .foregroundStyle(dieTempColor)
+
+                            if telemetry.fan.isRealHardwareThermals {
+                                AccentBadge("SMC", color: ROGColor.good)
+                            }
+                        }
+
+                        Text("Coffee Lake DTS")
+                            .font(ROGType.footnote())
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    // Thermal Headroom
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("Thermal Headroom")
+                            .font(ROGType.caption())
+                            .foregroundStyle(.secondary)
+
+                        Text("\(telemetry.fan.thermalHeadroomPercent)%")
+                            .font(ROGType.heroNumber())
+                            .foregroundStyle(ROGColor.info)
+
+                        Text("Until 100°C Tjunction")
+                            .font(ROGType.footnote())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(12)
+                .background(Color(NSColor.controlBackgroundColor).opacity(0.35))
+                .clipShape(RoundedRectangle(cornerRadius: ROGRadius.tile, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: ROGRadius.tile, style: .continuous)
+                        .stroke(ROGColor.hairline, lineWidth: 0.5)
+                )
+
+                // Cooling Array Status Tile
+                HStack(spacing: 10) {
+                    Image(systemName: "fanblades.fill")
+                        .font(.system(size: 15))
+                        .foregroundStyle(ROGColor.info)
+
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Dual Blower Cooling Array")
+                            .font(ROGType.bodyEmphasized())
+                            .foregroundStyle(.primary)
+
+                        Text("Phase: \(telemetry.fan.coolingPhaseTitle)")
+                            .font(ROGType.caption())
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(telemetry.fan.isRealFanRPM ? "\(telemetry.fan.fanRPM) RPM" : "~\(telemetry.fan.fanRPM) RPM")
+                            .font(ROGType.inlineNumber())
+                            .foregroundStyle(.primary)
+                            .monospacedDigit()
+
+                        AccentBadge(telemetry.fan.isRealFanRPM ? "SMC" : "EST", color: telemetry.fan.isRealFanRPM ? ROGColor.good : .secondary)
+                    }
+                }
+                .padding(11)
+                .background(Color(NSColor.controlBackgroundColor).opacity(0.28))
+                .clipShape(RoundedRectangle(cornerRadius: ROGRadius.tile, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: ROGRadius.tile, style: .continuous)
+                        .stroke(ROGColor.hairline, lineWidth: 0.5)
+                )
+            }
+        }
+    }
+}
+
+// MARK: - 2. System Architecture & Battery Bento Card (Bottom-Left)
+
+struct SystemArchitectureBentoCard: View {
     @ObservedObject var telemetry = TelemetryService.shared
 
     private var cleanCPUName: String {
@@ -54,493 +160,402 @@ struct SystemArchitectureCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Label("SYSTEM ARCHITECTURE", systemImage: "cpu")
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundColor(.secondary)
-                Spacer()
-                Text("GL503GE")
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background(Color.red.opacity(0.18))
-                    .foregroundColor(.red)
-                    .cornerRadius(4)
-            }
-
-            VStack(alignment: .leading, spacing: 6) {
-                SpecRow(title: "Processor", value: cleanCPUName)
-                SpecRow(title: "Topology", value: "\(telemetry.specs.physicalCores) Cores · \(telemetry.specs.logicalThreads) Threads")
-                SpecRow(title: "Memory", value: "\(telemetry.specs.totalRAMGB) GB DDR4 · 2667 MHz")
-                SpecRow(title: "Operating System", value: telemetry.specs.osVersion)
-                SpecRow(title: "Kernel Uptime", value: telemetry.specs.uptimeString)
-            }
-        }
-        .padding(12)
-        .background(Color(NSColor.controlBackgroundColor).opacity(0.45))
-        .cornerRadius(10)
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Color(NSColor.separatorColor).opacity(0.4), lineWidth: 0.5)
-        )
-    }
-}
-
-struct SpecRow: View {
-    let title: String
-    let value: String
-
-    init(title: String, value: String) {
-        self.title = title
-        self.value = value
-    }
-
-    init(label: String, value: String) {
-        self.title = label
-        self.value = value
-    }
-
-    var body: some View {
-        HStack {
-            Text(title)
-                .font(.system(size: 10.5))
-                .foregroundColor(.secondary)
-            Spacer()
-            Text(value)
-                .font(.system(size: 10.5, weight: .medium, design: .monospaced))
-                .foregroundColor(.primary)
-        }
-    }
-}
-
-// MARK: - Column 1: Battery Telemetry
-
-struct BatteryTelemetryCard: View {
-    @ObservedObject var telemetry = TelemetryService.shared
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Label("LITHIUM BATTERY", systemImage: "battery.100.bolt")
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundColor(.secondary)
-                Spacer()
-                Text(telemetry.battery.isCharging ? "Charging" : (telemetry.battery.isACConnected ? "AC Power" : "Battery"))
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .foregroundColor(telemetry.battery.isCharging ? .green : .secondary)
-            }
-
-            VStack(alignment: .leading, spacing: 6) {
-                SpecRow(title: "Charge Level", value: "\(telemetry.battery.currentCapacity)%")
-                SpecRow(title: "Live Draw", value: String(format: "%.1f W (%.2fV)", telemetry.battery.liveWatts, telemetry.battery.voltageVolts))
-                SpecRow(title: "Battery Health", value: "\(telemetry.battery.healthPercent)% · \(telemetry.battery.condition)")
-                SpecRow(title: "Cycle Count", value: "\(telemetry.battery.cycleCount)")
-            }
-        }
-        .padding(12)
-        .background(Color(NSColor.controlBackgroundColor).opacity(0.45))
-        .cornerRadius(10)
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Color(NSColor.separatorColor).opacity(0.4), lineWidth: 0.5)
-        )
-    }
-}
-
-// MARK: - Column 2: Center Silicon Thermal Stage
-
-struct SiliconThermalStageCard: View {
-    @ObservedObject var telemetry = TelemetryService.shared
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Label("SILICON THERMAL STAGE", systemImage: "thermometer.sun.fill")
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundColor(.secondary)
-                Spacer()
-                Text("Autonomous EC")
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .foregroundColor(.blue)
-            }
-
-            // Hero Dual Readout (Silicon Temp & Thermal Headroom)
-            HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("SILICON DIE")
-                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                        .foregroundColor(.secondary)
-
-                    HStack(alignment: .firstTextBaseline, spacing: 4) {
-                        Text("\(telemetry.fan.cpuTempCelsius)°C")
-                            .font(.system(size: 32, weight: .bold, design: .rounded))
-                            .foregroundColor(tempColor(telemetry.fan.cpuTempCelsius))
-
-                        if telemetry.fan.isRealHardwareThermals {
-                            Text("SMC")
-                                .font(.system(size: 8, weight: .bold))
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 1)
-                                .background(Color.green.opacity(0.2))
-                                .foregroundColor(.green)
-                                .cornerRadius(3)
-                        }
-                    }
-                    Text("Coffee Lake DTS")
-                        .font(.system(size: 9))
-                        .foregroundColor(.secondary)
-                }
-
-                Spacer()
-
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("THERMAL HEADROOM")
-                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                        .foregroundColor(.secondary)
-
-                    Text("\(telemetry.fan.thermalHeadroomPercent)%")
-                        .font(.system(size: 32, weight: .bold, design: .rounded))
-                        .foregroundColor(.blue)
-
-                    Text("Until 100°C Tjunction")
-                        .font(.system(size: 9))
-                        .foregroundColor(.secondary)
-                }
-            }
-            .padding(12)
-            .background(Color.black.opacity(0.25))
-            .cornerRadius(8)
-
-            // Dual Blower Cooling Array Status
-            HStack {
-                HStack(spacing: 6) {
-                    Image(systemName: "fanblades.fill")
-                        .font(.system(size: 13))
-                        .foregroundColor(.blue)
-
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Dual Blower Cooling Array")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(.primary)
-
-                        Text("Phase: \(telemetry.fan.coolingPhaseTitle)")
-                            .font(.system(size: 9.5))
-                            .foregroundColor(.secondary)
-                    }
-                }
-
-                Spacer()
-
-                Text("~\(telemetry.fan.fanRPM) RPM")
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
-                    .foregroundColor(.primary)
-            }
-            .padding(10)
-            .background(Color.black.opacity(0.18))
-            .cornerRadius(8)
-
-            // Rolling Mach Load Wave
-            VStack(alignment: .leading, spacing: 4) {
+        AppleBentoCard(padding: 16) {
+            VStack(alignment: .leading, spacing: 11) {
+                // Section Header
                 HStack {
-                    Text("LIVE SILICON LOAD (24-POINT)")
-                        .font(.system(size: 8.5, weight: .semibold, design: .monospaced))
-                        .foregroundColor(.secondary)
+                    SectionLabel("System Architecture & Battery", systemImage: "laptopcomputer")
                     Spacer()
-                    Text("\(Int(telemetry.cpuLoad.totalUsagePercent))% Now")
-                        .font(.system(size: 8.5, weight: .bold, design: .monospaced))
-                        .foregroundColor(.blue)
+                    AccentBadge("GL503GE", color: ROGColor.accent)
                 }
 
-                GeometryReader { geo in
-                    let points = telemetry.cpuHistory
-                    Path { path in
-                        guard points.count > 1 else { return }
-                        let step = geo.size.width / CGFloat(points.count - 1)
-                        let height = geo.size.height
+                // Specification Rows
+                VStack(spacing: 6) {
+                    LabeledRow("Processor", cleanCPUName)
+                    LabeledRow("Topology", "\(telemetry.specs.physicalCores) Cores · \(telemetry.specs.logicalThreads) Threads")
+                    LabeledRow("Memory", "\(telemetry.specs.totalRAMGB) GB DDR4 · 2667 MHz")
+                    LabeledRow("Operating System", telemetry.specs.osVersion)
+                    LabeledRow("Kernel Uptime", telemetry.specs.uptimeString)
+                }
 
-                        for (index, val) in points.enumerated() {
-                            let norm = min(1.0, max(0.0, val / 100.0))
-                            let y = height - (CGFloat(norm) * (height - 4)) - 2
-                            let x = CGFloat(index) * step
-                            if index == 0 {
-                                path.move(to: CGPoint(x: x, y: y))
-                            } else {
-                                path.addLine(to: CGPoint(x: x, y: y))
+                Divider()
+                    .background(ROGColor.hairline)
+
+                // Battery Telemetry
+                VStack(spacing: 6) {
+                    HStack {
+                        Text("Battery Status")
+                            .font(ROGType.body())
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        AccentBadge(
+                            "\(telemetry.battery.currentCapacity)% · " + (telemetry.battery.isCharging ? "Charging" : (telemetry.battery.isACConnected ? "AC Power" : "Battery")),
+                            color: telemetry.battery.isCharging ? ROGColor.good : .secondary
+                        )
+                    }
+
+                    LabeledRow("Live Power Draw", String(format: "%.1f W (%.2fV)", telemetry.battery.liveWatts, telemetry.battery.voltageVolts))
+                    LabeledRow("Battery Health", "\(telemetry.battery.healthPercent)% · \(telemetry.battery.condition)")
+                    LabeledRow("Cycle Count", "\(telemetry.battery.cycleCount)")
+                }
+            }
+        }
+    }
+}
+
+// MARK: - 3. Silicon Vitality & Memory Bento Card (Top-Right)
+
+struct SiliconVitalityBentoCard: View {
+    @ObservedObject var telemetry = TelemetryService.shared
+
+    var body: some View {
+        AppleBentoCard(padding: 16) {
+            VStack(alignment: .leading, spacing: 12) {
+                // Header
+                HStack {
+                    SectionLabel("Silicon Vitality & Memory", systemImage: "cpu")
+                    Spacer()
+                    AccentBadge("Mach Telemetry", color: .purple)
+                }
+
+                // Dual Activity Rings (CPU & RAM)
+                HStack(spacing: 16) {
+                    // CPU Ring
+                    HStack(spacing: 12) {
+                        ZStack {
+                            ActivityRing(
+                                progress: telemetry.cpuLoad.totalUsagePercent / 100.0,
+                                ringWidth: 7,
+                                gradientColors: [Color.cyan, Color.blue]
+                            )
+                            .frame(width: 58, height: 58)
+
+                            VStack(spacing: 0) {
+                                Text("\(Int(telemetry.cpuLoad.totalUsagePercent))%")
+                                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                                    .foregroundStyle(.primary)
                             }
                         }
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("CPU Load")
+                                .font(ROGType.bodyEmphasized())
+                                .foregroundStyle(.primary)
+
+                            Text("\(Int(telemetry.cpuLoad.totalUsagePercent))% Active")
+                                .font(ROGType.caption())
+                                .foregroundStyle(.secondary)
+
+                            Text("Mach Host Ticks")
+                                .font(ROGType.footnote())
+                                .foregroundStyle(.secondary.opacity(0.8))
+                        }
                     }
-                    .stroke(
-                        LinearGradient(colors: [Color.blue, Color.cyan], startPoint: .leading, endPoint: .trailing),
-                        style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+                    .background(Color(NSColor.controlBackgroundColor).opacity(0.35))
+                    .clipShape(RoundedRectangle(cornerRadius: ROGRadius.tile, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: ROGRadius.tile, style: .continuous)
+                            .stroke(ROGColor.hairline, lineWidth: 0.5)
+                    )
+
+                    // RAM Ring
+                    HStack(spacing: 12) {
+                        ZStack {
+                            ActivityRing(
+                                progress: telemetry.memory.usedPercent / 100.0,
+                                ringWidth: 7,
+                                gradientColors: [Color.purple, Color.pink]
+                            )
+                            .frame(width: 58, height: 58)
+
+                            VStack(spacing: 0) {
+                                Text("\(Int(telemetry.memory.usedPercent))%")
+                                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                                    .foregroundStyle(.primary)
+                            }
+                        }
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("RAM Usage")
+                                .font(ROGType.bodyEmphasized())
+                                .foregroundStyle(.primary)
+
+                            Text(String(format: "%.1f / %.1f GB", telemetry.memory.usedGB, telemetry.memory.totalGB))
+                                .font(ROGType.caption())
+                                .foregroundStyle(.secondary)
+
+                            Text("\(Int(telemetry.memory.usedPercent))% Allocated")
+                                .font(ROGType.footnote())
+                                .foregroundStyle(.secondary.opacity(0.8))
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+                    .background(Color(NSColor.controlBackgroundColor).opacity(0.35))
+                    .clipShape(RoundedRectangle(cornerRadius: ROGRadius.tile, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: ROGRadius.tile, style: .continuous)
+                            .stroke(ROGColor.hairline, lineWidth: 0.5)
                     )
                 }
-                .frame(height: 38)
-            }
-        }
-        .padding(14)
-        .background(Color(NSColor.controlBackgroundColor).opacity(0.45))
-        .cornerRadius(10)
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Color(NSColor.separatorColor).opacity(0.4), lineWidth: 0.5)
-        )
-    }
 
-    private func tempColor(_ temp: Int) -> Color {
-        if temp < 55 { return .green }
-        if temp < 75 { return .orange }
-        return .red
-    }
-}
+                // Rolling Sparkline History
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Active Silicon Load History (24-Point)")
+                            .font(ROGType.caption())
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text("\(Int(telemetry.cpuLoad.totalUsagePercent))% Current")
+                            .font(ROGType.caption())
+                            .foregroundStyle(ROGColor.info)
+                            .monospacedDigit()
+                    }
 
-// MARK: - Column 3: Dual Circular Gauges (Homage to Windows Gauges)
+                    GeometryReader { geo in
+                        let points = telemetry.cpuHistory
+                        let step = points.count > 1 ? geo.size.width / CGFloat(points.count - 1) : 0
+                        let height = geo.size.height
 
-struct CPUDialView: View {
-    let usagePercent: Double
+                        // Gradient Fill Path
+                        Path { path in
+                            guard points.count > 1 else { return }
+                            path.move(to: CGPoint(x: 0, y: height))
+                            for (index, val) in points.enumerated() {
+                                let norm = min(1.0, max(0.0, val / 100.0))
+                                let y = height - (CGFloat(norm) * (height - 4)) - 2
+                                let x = CGFloat(index) * step
+                                path.addLine(to: CGPoint(x: x, y: y))
+                            }
+                            path.addLine(to: CGPoint(x: geo.size.width, y: height))
+                            path.closeSubpath()
+                        }
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.blue.opacity(0.25), Color.blue.opacity(0.02)],
+                                startPoint: .top, endPoint: .bottom
+                            )
+                        )
 
-    var body: some View {
-        VStack(spacing: 6) {
-            Text("CPU LOAD")
-                .font(.system(size: 9.5, weight: .bold, design: .monospaced))
-                .foregroundColor(.secondary)
-
-            ZStack {
-                Circle()
-                    .stroke(Color.secondary.opacity(0.2), lineWidth: 9)
-
-                Circle()
-                    .trim(from: 0, to: CGFloat(min(1.0, max(0.0, usagePercent / 100.0))))
-                    .stroke(
-                        LinearGradient(colors: [Color.blue, Color.cyan], startPoint: .topLeading, endPoint: .bottomTrailing),
-                        style: StrokeStyle(lineWidth: 9, lineCap: .round)
-                    )
-                    .rotationEffect(.degrees(-90))
-
-                VStack(spacing: 0) {
-                    Text("\(Int(usagePercent))%")
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
-                        .foregroundColor(.primary)
-                    Text("Active")
-                        .font(.system(size: 8))
-                        .foregroundColor(.secondary)
+                        // Stroke Path
+                        Path { path in
+                            guard points.count > 1 else { return }
+                            for (index, val) in points.enumerated() {
+                                let norm = min(1.0, max(0.0, val / 100.0))
+                                let y = height - (CGFloat(norm) * (height - 4)) - 2
+                                let x = CGFloat(index) * step
+                                if index == 0 {
+                                    path.move(to: CGPoint(x: x, y: y))
+                                } else {
+                                    path.addLine(to: CGPoint(x: x, y: y))
+                                }
+                            }
+                        }
+                        .stroke(
+                            LinearGradient(colors: [Color.blue, Color.cyan], startPoint: .leading, endPoint: .trailing),
+                            style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
+                        )
+                    }
+                    .frame(height: 38)
                 }
+                .padding(10)
+                .background(Color(NSColor.controlBackgroundColor).opacity(0.28))
+                .clipShape(RoundedRectangle(cornerRadius: ROGRadius.tile, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: ROGRadius.tile, style: .continuous)
+                        .stroke(ROGColor.hairline, lineWidth: 0.5)
+                )
             }
-            .frame(width: 82, height: 82)
-
-            Text("Mach Host Ticks")
-                .font(.system(size: 8.5))
-                .foregroundColor(.secondary)
         }
-        .padding(10)
-        .frame(maxWidth: .infinity)
-        .background(Color.black.opacity(0.22))
-        .cornerRadius(8)
     }
 }
 
-struct RAMDialView: View {
-    let usedPercent: Double
-    let usedGB: Double
-    let totalGB: Double
+// MARK: - 4. Hardware Quick Controls Bento Card (Bottom-Right)
 
-    var body: some View {
-        VStack(spacing: 6) {
-            Text("RAM UTILIZATION")
-                .font(.system(size: 9.5, weight: .bold, design: .monospaced))
-                .foregroundColor(.secondary)
-
-            ZStack {
-                Circle()
-                    .stroke(Color.secondary.opacity(0.2), lineWidth: 9)
-
-                Circle()
-                    .trim(from: 0, to: CGFloat(min(1.0, max(0.0, usedPercent / 100.0))))
-                    .stroke(
-                        LinearGradient(colors: [Color.purple, Color.pink], startPoint: .topLeading, endPoint: .bottomTrailing),
-                        style: StrokeStyle(lineWidth: 9, lineCap: .round)
-                    )
-                    .rotationEffect(.degrees(-90))
-
-                VStack(spacing: 0) {
-                    Text("\(Int(usedPercent))%")
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
-                        .foregroundColor(.primary)
-                    Text(String(format: "%.1fG", usedGB))
-                        .font(.system(size: 8))
-                        .foregroundColor(.secondary)
-                }
-            }
-            .frame(width: 82, height: 82)
-
-            Text("\(String(format: "%.1f", usedGB)) / \(String(format: "%.1f", totalGB)) GB")
-                .font(.system(size: 8.5, weight: .medium, design: .monospaced))
-                .foregroundColor(.secondary)
-        }
-        .padding(10)
-        .frame(maxWidth: .infinity)
-        .background(Color.black.opacity(0.22))
-        .cornerRadius(8)
-    }
-}
-
-struct CircularGaugesCard: View {
-    @ObservedObject var telemetry = TelemetryService.shared
-
-    var body: some View {
-        VStack(spacing: 12) {
-            CPUDialView(usagePercent: telemetry.cpuLoad.totalUsagePercent)
-            RAMDialView(usedPercent: telemetry.memory.usedPercent, usedGB: telemetry.memory.usedGB, totalGB: telemetry.memory.totalGB)
-        }
-        .padding(12)
-        .background(Color(NSColor.controlBackgroundColor).opacity(0.45))
-        .cornerRadius(10)
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Color(NSColor.separatorColor).opacity(0.4), lineWidth: 0.5)
-        )
-    }
-}
-
-// MARK: - Bottom Tray: Quick Hardware Controls Dock (Windows Bottom Dock Homage)
-
-struct QuickHardwareDock: View {
+struct QuickHardwareControlsBentoCard: View {
     @ObservedObject var service = AuraService.shared
     @ObservedObject var telemetry = TelemetryService.shared
 
     var body: some View {
-        HStack(spacing: 12) {
-            // Card 1: Backlight Power Toggle
-            DockCard(title: "BACKLIGHT POWER", icon: service.isPoweredOn ? "power.circle.fill" : "power.circle") {
-                Button(action: {
-                    service.togglePower()
-                }) {
-                    Text(service.isPoweredOn ? "ON" : "OFF")
-                        .font(.system(size: 11, weight: .bold, design: .monospaced))
-                        .foregroundColor(service.isPoweredOn ? .white : .secondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
-                        .background(
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(service.isPoweredOn ? Color.green : Color(NSColor.controlColor).opacity(0.6))
-                        )
-                }
-                .buttonStyle(PlainButtonStyle())
-            }
-
-            // Card 2: Brightness Selector
-            DockCard(title: "BRIGHTNESS", icon: "sun.max.fill") {
-                HStack(spacing: 4) {
-                    DockMiniButton(title: "0", isSelected: !service.isPoweredOn || service.currentBrightness == 0) {
-                        service.setBrightness(0)
-                    }
-                    DockMiniButton(title: "33", isSelected: service.isPoweredOn && service.currentBrightness == 1) {
-                        service.setBrightness(1)
-                    }
-                    DockMiniButton(title: "66", isSelected: service.isPoweredOn && service.currentBrightness == 2) {
-                        service.setBrightness(2)
-                    }
-                    DockMiniButton(title: "100", isSelected: service.isPoweredOn && service.currentBrightness == 3) {
-                        service.setBrightness(3)
-                    }
-                }
-            }
-
-            // Card 3: Active Aura Core Mode
-            DockCard(title: "AURA CORE", icon: "sparkles") {
+        AppleBentoCard(padding: 16) {
+            VStack(alignment: .leading, spacing: 12) {
+                // Header
                 HStack {
-                    Text(service.activePresetId.capitalized.replacingOccurrences(of: "_", with: " "))
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
-
+                    SectionLabel("Hardware Quick Controls", systemImage: "slider.horizontal.3")
                     Spacer()
-
-                    Button(action: {
-                        service.cycleToNextPreset()
-                    }) {
-                        Image(systemName: "arrow.triangle.2.circlepath")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(.blue)
-                            .padding(5)
-                            .background(Color.blue.opacity(0.15))
-                            .clipShape(Circle())
-                    }
-                    .buttonStyle(PlainButtonStyle())
                 }
-            }
 
-            // Card 4: GameVisual Display Gamma
-            DockCard(title: "GAMEVISUAL", icon: "eye.fill") {
-                HStack(spacing: 4) {
-                    ForEach(ROGDisplayProfile.allCases) { profile in
-                        Button(action: {
-                            telemetry.setDisplayProfile(profile)
-                        }) {
-                            Text(profileShortName(profile))
-                                .font(.system(size: 9.5, weight: telemetry.activeDisplayProfile == profile ? .bold : .regular))
-                                .foregroundColor(telemetry.activeDisplayProfile == profile ? .white : .secondary)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 5)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 5)
-                                        .fill(telemetry.activeDisplayProfile == profile ? Color.blue : Color(NSColor.controlColor).opacity(0.6))
-                                )
+                // 1. Backlight Power & Brightness
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Image(systemName: "sun.max.fill")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                        Text("Keyboard Backlight")
+                            .font(ROGType.caption())
+                            .foregroundStyle(.secondary)
+                    }
+
+                    HStack(spacing: 8) {
+                        // Power Button
+                        Button(action: { service.togglePower() }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: service.isPoweredOn ? "power.circle.fill" : "power.circle")
+                                    .font(.system(size: 12, weight: .semibold))
+                                Text(service.isPoweredOn ? "Power On" : "Power Off")
+                                    .font(ROGType.caption())
+                                    .fontWeight(.medium)
+                            }
+                            .foregroundStyle(service.isPoweredOn ? ROGColor.good : .secondary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(
+                                RoundedRectangle(cornerRadius: ROGRadius.control, style: .continuous)
+                                    .fill(service.isPoweredOn ? ROGColor.good.opacity(0.15) : Color(NSColor.controlColor).opacity(0.4))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: ROGRadius.control, style: .continuous)
+                                    .stroke(service.isPoweredOn ? ROGColor.good.opacity(0.3) : ROGColor.hairline, lineWidth: 0.5)
+                            )
                         }
                         .buttonStyle(PlainButtonStyle())
+                        .focusable(false)
+
+                        // Segmented Brightness (0, 33%, 66%, 100%)
+                        HStack(spacing: 3) {
+                            BrightnessSegmentButton(title: "Off", isSelected: !service.isPoweredOn || service.currentBrightness == 0) {
+                                service.setBrightness(0)
+                            }
+                            BrightnessSegmentButton(title: "33%", isSelected: service.isPoweredOn && service.currentBrightness == 1) {
+                                service.setBrightness(1)
+                            }
+                            BrightnessSegmentButton(title: "66%", isSelected: service.isPoweredOn && service.currentBrightness == 2) {
+                                service.setBrightness(2)
+                            }
+                            BrightnessSegmentButton(title: "100%", isSelected: service.isPoweredOn && service.currentBrightness == 3) {
+                                service.setBrightness(3)
+                            }
+                        }
+                        .padding(2)
+                        .background(Color(NSColor.controlBackgroundColor).opacity(0.4))
+                        .clipShape(RoundedRectangle(cornerRadius: ROGRadius.control, style: .continuous))
+                    }
+                }
+
+                Divider()
+                    .background(ROGColor.hairline)
+
+                // 2. Aura Core Preset Mode
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                        Text("Aura RGB Lighting Mode")
+                            .font(ROGType.caption())
+                            .foregroundStyle(.secondary)
+                    }
+
+                    HStack {
+                        HStack(spacing: 8) {
+                            Circle()
+                                .fill(ROGColor.accent)
+                                .frame(width: 8, height: 8)
+                            Text(service.activePresetName)
+                                .font(ROGType.bodyEmphasized())
+                                .foregroundStyle(.primary)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color(NSColor.controlBackgroundColor).opacity(0.4))
+                        .clipShape(RoundedRectangle(cornerRadius: ROGRadius.control, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: ROGRadius.control, style: .continuous)
+                                .stroke(ROGColor.hairline, lineWidth: 0.5)
+                        )
+
+                        Spacer()
+
+                        Button(action: { service.cycleToNextPreset() }) {
+                            HStack(spacing: 5) {
+                                Image(systemName: "arrow.triangle.2.circlepath")
+                                    .font(.system(size: 11, weight: .semibold))
+                                Text("Next Preset")
+                                    .font(ROGType.caption())
+                            }
+                            .foregroundStyle(ROGColor.info)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(ROGColor.info.opacity(0.12))
+                            .clipShape(RoundedRectangle(cornerRadius: ROGRadius.control, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: ROGRadius.control, style: .continuous)
+                                    .stroke(ROGColor.info.opacity(0.25), lineWidth: 0.5)
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .focusable(false)
+                    }
+                }
+
+                Divider()
+                    .background(ROGColor.hairline)
+
+                // 3. GameVisual Display Profile
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Image(systemName: "eye.fill")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                        Text("GameVisual Display Profile")
+                            .font(ROGType.caption())
+                            .foregroundStyle(.secondary)
+                    }
+
+                    HStack(spacing: 4) {
+                        ForEach(ROGDisplayProfile.allCases) { profile in
+                            let isSelected = telemetry.activeDisplayProfile == profile
+                            Button(action: { telemetry.setDisplayProfile(profile) }) {
+                                Text(profileShortName(profile))
+                                    .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
+                                    .foregroundStyle(isSelected ? .white : .secondary)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 5)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: ROGRadius.control, style: .continuous)
+                                            .fill(isSelected ? ROGColor.info : Color(NSColor.controlColor).opacity(0.35))
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: ROGRadius.control, style: .continuous)
+                                            .stroke(isSelected ? Color.clear : ROGColor.hairline, lineWidth: 0.5)
+                                    )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .focusable(false)
+                        }
                     }
                 }
             }
         }
-        .padding(12)
-        .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
-        .cornerRadius(10)
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Color(NSColor.separatorColor).opacity(0.4), lineWidth: 0.5)
-        )
     }
 
     private func profileShortName(_ profile: ROGDisplayProfile) -> String {
         switch profile {
-        case .standard: return "Def"
+        case .standard: return "Standard"
         case .vividGaming: return "Vivid"
-        case .eyeCare: return "Eye"
-        case .cinema: return "Film"
+        case .eyeCare: return "Eye Care"
+        case .cinema: return "Cinema"
         case .fps: return "FPS"
         case .rts: return "RTS"
         }
     }
 }
 
-struct DockCard<Content: View>: View {
-    let title: String
-    let icon: String
-    let content: () -> Content
+// MARK: - Subcomponents
 
-    init(title: String, icon: String, @ViewBuilder content: @escaping () -> Content) {
-        self.title = title
-        self.icon = icon
-        self.content = content
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.system(size: 9))
-                    .foregroundColor(.secondary)
-                Text(title)
-                    .font(.system(size: 8.5, weight: .bold, design: .monospaced))
-                    .foregroundColor(.secondary)
-            }
-            content()
-        }
-        .frame(maxWidth: .infinity)
-    }
-}
-
-struct DockMiniButton: View {
+struct BrightnessSegmentButton: View {
     let title: String
     let isSelected: Bool
     let action: () -> Void
@@ -548,15 +563,16 @@ struct DockMiniButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 10, weight: isSelected ? .bold : .regular, design: .monospaced))
-                .foregroundColor(isSelected ? .white : .secondary)
+                .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
+                .foregroundStyle(isSelected ? .white : .secondary)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 5)
+                .padding(.vertical, 4)
                 .background(
-                    RoundedRectangle(cornerRadius: 5)
-                        .fill(isSelected ? Color.blue : Color(NSColor.controlColor).opacity(0.6))
+                    RoundedRectangle(cornerRadius: ROGRadius.control - 2, style: .continuous)
+                        .fill(isSelected ? ROGColor.info : Color.clear)
                 )
         }
         .buttonStyle(PlainButtonStyle())
+        .focusable(false)
     }
 }

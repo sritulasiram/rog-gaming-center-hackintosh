@@ -15,32 +15,36 @@ public struct ROGLogoView: View {
             Image(nsImage: image)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .frame(width: size, height: size)
-                .shadow(color: Color(red: 0.9, green: 0.05, blue: 0.15).opacity(0.25), radius: 2, y: 1)
+                .frame(width: size, height: size * 0.62)
+                .shadow(color: Color.white.opacity(0.15), radius: 3, y: 1)
         } else {
-            // Crisp fallback: Vector ROG Eye
+            // Crisp fallback: Pure White Vector ROG Eye
             ROGEyeVectorShape()
-                .fill(tintColor ?? Color(red: 0.92, green: 0.06, blue: 0.16))
-                .frame(width: size, height: size * 0.72)
+                .fill(tintColor ?? Color.white)
+                .frame(width: size, height: size * 0.62)
         }
     }
 
     private func loadLogoImage() -> NSImage? {
-        // 1. Bundle Resource
-        if let bundlePath = Bundle.main.path(forResource: "logo", ofType: "png"),
-           let img = NSImage(contentsOfFile: bundlePath) {
-            return img
-        }
-        if let bundlePath = Bundle.main.path(forResource: "app_icon", ofType: "png"),
-           let img = NSImage(contentsOfFile: bundlePath) {
-            return img
+        // 1. Bundle Resources (Prioritize Official SVG Emblem)
+        let candidates: [(String, String)] = [
+            ("rog_emblem_white", "svg"),
+            ("rog_logo_white", "png"),
+            ("rog_emblem_white", "png")
+        ]
+        for (name, ext) in candidates {
+            if let path = Bundle.main.path(forResource: name, ofType: ext),
+               let img = NSImage(contentsOfFile: path) {
+                return img
+            }
         }
 
         // 2. Relative project search
         let projectPaths = [
-            "./Resources/logo.png",
-            "./Resources/app_icon.png",
-            "/Applications/ROG Gaming Center.app/Contents/Resources/logo.png"
+            "./Resources/rog_emblem_white.svg",
+            "./Resources/rog_logo_white.png",
+            "/Applications/ROG Gaming Center.app/Contents/Resources/rog_emblem_white.svg",
+            "/Applications/ROG Gaming Center.app/Contents/Resources/rog_logo_white.png"
         ]
         for p in projectPaths {
             if FileManager.default.fileExists(atPath: p), let img = NSImage(contentsOfFile: p) {

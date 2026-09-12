@@ -6,3 +6,4 @@ build/
 *.app
 *.dSYM/
 scratch/
+*.zip
