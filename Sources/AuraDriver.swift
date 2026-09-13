@@ -47,7 +47,13 @@ public final class AuraDriver {
 
     public var onDeviceStateChanged: ((Bool, AuraDeviceInfo?) -> Void)?
     public var onROGKeyPressed: (() -> Void)?
+    public var onBrightnessUpPressed: (() -> Void)?
+    public var onBrightnessDownPressed: (() -> Void)?
+    public var onFanKeyPressed: (() -> Void)?
+    public var onTouchpadTogglePressed: (() -> Void)?
+    public var onSleepKeyPressed: (() -> Void)?
     private var lastROGKeyPressTimestamp: TimeInterval = 0
+    private var lastBrightnessTimestamp: TimeInterval = 0
 
     /// Fires whenever the app's ability to actually talk to the HID device changes.
     /// This is the signal the UI should use to tell "device unplugged" apart from
@@ -89,9 +95,25 @@ public final class AuraDriver {
             let usage = IOHIDElementGetUsage(elem)
             let intVal = IOHIDValueGetIntegerValue(value)
 
-            // ASUS ROG Key (UsagePage: 0xFF31 / 0xFF89 / 0xFF00, Usage: 0x0038, Value: 1 = KeyDown)
-            if (page == 0xFF31 || page == 0xFF89 || page == 0xFF00) && usage == 0x0038 && intVal == 1 {
-                driver.handleROGKeyPress()
+            guard intVal == 1 else { return }
+
+            if page == 0xFF31 || page == 0xFF89 || page == 0xFF00 {
+                switch usage {
+                case 0x0038, 0x00F8:
+                    driver.handleROGKeyPress()
+                case 0x00C4: // Keyboard Backlight Up (Fn + Up Arrow)
+                    driver.handleBrightnessUpPress()
+                case 0x00C5: // Keyboard Backlight Down (Fn + Down Arrow)
+                    driver.handleBrightnessDownPress()
+                case 0x0099, 0x00AE: // Fan Boost (Fn + F5)
+                    driver.handleFanKeyPress()
+                case 0x006B: // Touchpad Toggle (Fn + F6)
+                    driver.handleTouchpadTogglePress()
+                case 0x006C: // Sleep (Fn + F11)
+                    driver.handleSleepKeyPress()
+                default:
+                    break
+                }
             }
         }
 
@@ -100,9 +122,23 @@ public final class AuraDriver {
             let driver = Unmanaged<AuraDriver>.fromOpaque(context).takeUnretainedValue()
             let b0 = report[0]
             let b1 = report[1]
-            // Report 0x5A with payload byte 0x38 indicates physical ROG key press
-            if (reportID == 0x5A || b0 == 0x5A) && b1 == 0x38 {
-                driver.handleROGKeyPress()
+            if reportID == 0x5A || b0 == 0x5A {
+                switch b1 {
+                case 0x38, 0xF8:
+                    driver.handleROGKeyPress()
+                case 0xC4:
+                    driver.handleBrightnessUpPress()
+                case 0xC5:
+                    driver.handleBrightnessDownPress()
+                case 0x99, 0xAE:
+                    driver.handleFanKeyPress()
+                case 0x6B:
+                    driver.handleTouchpadTogglePress()
+                case 0x6C:
+                    driver.handleSleepKeyPress()
+                default:
+                    break
+                }
             }
         }
 
@@ -136,6 +172,53 @@ public final class AuraDriver {
         NSLog("[ROGAuraDriver] 🕹️ Hardware ROG Key press detected (Usage 0x0038 / Report 0x5A)")
         DispatchQueue.main.async { [weak self] in
             self?.onROGKeyPressed?()
+        }
+    }
+
+    public func handleBrightnessUpPress() {
+        keyLock.lock()
+        let now = Date().timeIntervalSince1970
+        let elapsed = now - lastBrightnessTimestamp
+        if elapsed > 0.15 { lastBrightnessTimestamp = now }
+        keyLock.unlock()
+        guard elapsed > 0.15 else { return }
+        NSLog("[ROGAuraDriver] 🔆 Hardware Keyboard Brightness Up (Usage 0x00C4)")
+        DispatchQueue.main.async { [weak self] in
+            self?.onBrightnessUpPressed?()
+        }
+    }
+
+    public func handleBrightnessDownPress() {
+        keyLock.lock()
+        let now = Date().timeIntervalSince1970
+        let elapsed = now - lastBrightnessTimestamp
+        if elapsed > 0.15 { lastBrightnessTimestamp = now }
+        keyLock.unlock()
+        guard elapsed > 0.15 else { return }
+        NSLog("[ROGAuraDriver] 🔅 Hardware Keyboard Brightness Down (Usage 0x00C5)")
+        DispatchQueue.main.async { [weak self] in
+            self?.onBrightnessDownPressed?()
+        }
+    }
+
+    public func handleFanKeyPress() {
+        NSLog("[ROGAuraDriver] 🌀 Hardware Fan Key (Usage 0x0099/0x00AE)")
+        DispatchQueue.main.async { [weak self] in
+            self?.onFanKeyPressed?()
+        }
+    }
+
+    public func handleTouchpadTogglePress() {
+        NSLog("[ROGAuraDriver] 🖲️ Hardware Touchpad Toggle (Usage 0x006B)")
+        DispatchQueue.main.async { [weak self] in
+            self?.onTouchpadTogglePressed?()
+        }
+    }
+
+    public func handleSleepKeyPress() {
+        NSLog("[ROGAuraDriver] 💤 Hardware Sleep Key (Usage 0x006C)")
+        DispatchQueue.main.async { [weak self] in
+            self?.onSleepKeyPressed?()
         }
     }
 
