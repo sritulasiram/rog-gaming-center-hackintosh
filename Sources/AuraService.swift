@@ -185,6 +185,26 @@ public final class AuraService: ObservableObject {
                 self.handleROGKeyTrigger()
             }
         }
+
+        driver.onBrightnessUpPressed = { [weak self] in
+            DispatchQueue.main.async {
+                self?.stepBrightnessUp()
+                self?.postKbdBrightnessHUD(down: false)
+            }
+        }
+
+        driver.onBrightnessDownPressed = { [weak self] in
+            DispatchQueue.main.async {
+                self?.stepBrightnessDown()
+                self?.postKbdBrightnessHUD(down: true)
+            }
+        }
+
+        driver.onSleepKeyPressed = {
+            DispatchQueue.main.async {
+                NSAppleScript(source: "tell application \"System Events\" to sleep")?.executeAndReturnError(nil)
+            }
+        }
     }
 
     // MARK: - Dedicated Hardware ROG Key Dispatcher
@@ -290,18 +310,40 @@ public final class AuraService: ObservableObject {
     @discardableResult
     private func handleKeyEvent(_ event: NSEvent) -> Bool {
         guard event.type == .keyDown else { return false }
+
+        // Support Page Up (116) and Page Down (121) emitted by PC Fn+Up / Fn+Down
+        if event.keyCode == 116 {
+            DispatchQueue.main.async { [weak self] in
+                self?.stepBrightnessUp()
+                self?.postKbdBrightnessHUD(down: false)
+            }
+            return true
+        } else if event.keyCode == 121 {
+            DispatchQueue.main.async { [weak self] in
+                self?.stepBrightnessDown()
+                self?.postKbdBrightnessHUD(down: true)
+            }
+            return true
+        }
+
         let flags = event.modifierFlags
         // Matches pure Fn held down, OR Control+Option fallback
         let isFn = flags.contains(.function) || flags.intersection(.deviceIndependentFlagsMask).contains([.control, .option])
         guard isFn else { return false }
 
         switch event.keyCode {
-        case 126, 116: // Up Arrow or Page Up -> Brightness Up
-            DispatchQueue.main.async { [weak self] in self?.stepBrightnessUp() }
+        case 126: // Up Arrow with Fn -> Brightness Up
+            DispatchQueue.main.async { [weak self] in
+                self?.stepBrightnessUp()
+                self?.postKbdBrightnessHUD(down: false)
+            }
             return true
 
-        case 125, 121: // Down Arrow or Page Down -> Brightness Down
-            DispatchQueue.main.async { [weak self] in self?.stepBrightnessDown() }
+        case 125: // Down Arrow with Fn -> Brightness Down
+            DispatchQueue.main.async { [weak self] in
+                self?.stepBrightnessDown()
+                self?.postKbdBrightnessHUD(down: true)
+            }
             return true
 
         case 100: // F8 -> Brightness Up
@@ -378,6 +420,14 @@ public final class AuraService: ObservableObject {
         default:
             return false
         }
+    }
+
+    public func postKbdBrightnessHUD(down: Bool) {
+        let key: Int32 = down ? 22 : 21 // 21 = NX_KEYTYPE_ILLUMINATION_UP, 22 = NX_KEYTYPE_ILLUMINATION_DOWN
+        let downEvent = NSEvent.otherEvent(with: .systemDefined, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, subtype: 8, data1: Int((key << 16) | (0xa << 8)), data2: -1)
+        let upEvent = NSEvent.otherEvent(with: .systemDefined, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, subtype: 8, data1: Int((key << 16) | (0xb << 8)), data2: -1)
+        downEvent?.cgEvent?.post(tap: .cghidEventTap)
+        upEvent?.cgEvent?.post(tap: .cghidEventTap)
     }
 
     private func postBrightnessKey(down: Bool) {
