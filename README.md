@@ -65,6 +65,7 @@ Full steps, signing and uninstalling: **[Installation](docs/INSTALLATION.md)**.
 | [CLI Reference](docs/CLI.md) | `rogauracore` commands and scripting examples |
 | [Troubleshooting](docs/TROUBLESHOOTING.md) | Lighting not responding, missing sensors, hotkeys, display issues |
 | [Architecture](docs/ARCHITECTURE.md) | Code layout, the Aura protocol, design decisions, development and tests |
+| [Contributing](CONTRIBUTING.md) | Reporting bugs, adding a laptop, pull requests |
 | [Changelog](CHANGELOG.md) | What changed in each release |
 
 ## Project Status

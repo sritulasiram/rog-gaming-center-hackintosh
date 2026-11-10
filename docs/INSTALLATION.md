@@ -7,6 +7,7 @@
 - [Permissions](#permissions)
 - [Code signing](#code-signing)
 - [Updating](#updating)
+  - [Upgrading from 1.x](#upgrading-from-1x)
 - [Uninstalling](#uninstalling)
 
 ## Requirements
@@ -143,6 +144,15 @@ Your settings, presets and display profile are kept. Settings from 1.x are migra
 > **You'll need to allow Input Monitoring again after every update.** `./build.sh --install` resets the app's Input Monitoring record on purpose, so macOS asks fresh instead of silently denying a changed build. Until you allow it, the menu bar shows "Keyboard access needed" and lighting and hotkeys don't respond. This happens even with an [Apple Development certificate](#code-signing).
 
 When updating from a disk image instead, quit the app, replace it in Applications, and open it again. If the keyboard stops responding, turn **ROG Gaming Center** off and on in Input Monitoring.
+
+### Upgrading from 1.x
+
+2.0 is a rebuild and needs macOS 14 Sonoma or later. Settings, saved presets and the display profile are migrated automatically on first launch. Two things changed:
+
+- The **battery charge limit** was removed.
+- The ROG key's "toggle popover" action now shows or hides the window.
+
+See the [changelog](../CHANGELOG.md) for the full list.
 
 ## Uninstalling
 

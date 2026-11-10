@@ -18,6 +18,8 @@ The app works with laptops that use ASUS's ITE USB lighting controller and the A
 | ROG Zephyrus | GX501, GM501, GA503, G531, G533, G733 | Expected to work |
 | TUF Gaming | FX504, FX505, FX705 (RGB models) | Expected to work |
 
+"Expected to work" means the model is known to use a supported product ID, but nobody has confirmed it yet. If you try one, please report the result (see [Reporting a bug](TROUBLESHOOTING.md#reporting-a-bug)) so its status can be updated.
+
 To check your machine, run:
 
 ```bash
@@ -26,7 +28,7 @@ rogauracore --diagnose
 
 It lists every ASUS HID interface and marks with `→` the one the app writes to. The app only writes to an ASUS interface on a vendor usage page that accepts full-size feature reports, so other ASUS devices such as mice and docks are never touched. If no interface is marked, please open an issue with the output.
 
-Known product IDs: `0x1869` (GL503 / GL703 / FX503), `0x1854` (GL553 / GL753), `0x1866` (GL504 / GX501 / GM501), `0x19B6` (GA503 / G533 / G733), plus `0x184A`, `0x1837`, `0x1822`, `0x18CF`, `0x18C6` and `0x1A30`.
+The list of known product IDs is `AuraInterfaceSelector.knownProductIDs` in `Sources/AuraCore/HardwareKeys.swift`. An unlisted ID can still work if the interface is on a vendor usage page that accepts full-size feature reports; `--diagnose` shows what was selected.
 
 ## USB mapping
 
@@ -46,7 +48,7 @@ The dashboard only shows readings macOS actually provides. Nothing is estimated.
 
 ### About fan speed
 
-On many ASUS laptops the fans are driven by the embedded controller (EC), and no macOS kext reads them. SMCSuperIO targets desktop Super I/O chips and usually doesn't support laptop ECs. If nothing publishes the `F0Ac` key, macOS has no fan reading. The app then shows only the CPU temperature, and **Status → Sensors** lists fan speed as "Not reported". The fans themselves still work normally under the EC's control.
+On many ASUS laptops the fans are driven by the embedded controller (EC), and no macOS kext reads them. SMCSuperIO targets desktop Super I/O chips and usually doesn't support laptop ECs. If nothing publishes the `F0Ac` key, macOS has no fan reading. The app then shows only the CPU temperature, and **Status → Sensors** lists fan speed as "Not reported" (and shows "Reported" when a value is available). The fans themselves still work normally under the EC's control.
 
 The app never controls fans, and macOS offers no way to do it on this hardware. The Fn+F5 fan key is recognized but intentionally does nothing.
 

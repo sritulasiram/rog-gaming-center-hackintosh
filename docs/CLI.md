@@ -25,8 +25,8 @@ Your terminal app needs **Input Monitoring** (System Settings → Privacy & Secu
 
 | Command | Description |
 | :--- | :--- |
-| `rogauracore --status`, `-s` | Show the lighting interface in use: name, IDs, transport, HID usage |
-| `rogauracore --json` | The same as JSON. `connected` is `false` when nothing is found. |
+| `rogauracore --status`, `-s` | Show the lighting interface in use: name, vendor and product ID, transport, HID usage, maximum feature report size and serial number (if any) |
+| `rogauracore --json` | The same as JSON (`connected`, `name`, `vendor_id`, `product_id`, `transport`, `usage_page`, `usage`, `serial`). When nothing is found it prints `connected` as `false` and exits with code 1. |
 | `rogauracore --diagnose` | List every ASUS HID interface, mark the one used for lighting (`→`), and show the Input Monitoring state |
 | `rogauracore --keys` | Print ROG hotkeys as you press them. Stop with Ctrl+C. |
 | `rogauracore --help` | Show usage |
@@ -48,9 +48,11 @@ Your terminal app needs **Input Monitoring** (System Settings → Privacy & Secu
 | `single_strobing` | `HEX [SPEED]` | Strobe |
 | `presets` | | List built-in presets |
 | `preset` | `NAME` | Apply a built-in preset by id or name, e.g. `cyberpunk`, `sunset`, `ocean` |
-| `red`, `green`, `blue`, `yellow`, `gold`, `cyan`, `magenta`, `white`, `purple`, `lime`, `orange`, `pink`, `black` | | Solid color shortcut (`black` turns the backlight off) |
+| `red`, `green`, `blue`, `yellow`, `gold`, `cyan`, `magenta`, `white`, `purple`, `lime`, `orange`, `pink`, `black` | | Solid color at full brightness (`black` turns the backlight off) |
 
 Aliases: `initialize_keyboard` (= `init`), `color_cycle` (= `single_colorcycle`), `rainbow_cycle` (= `rainbow`), `strobing` (= `single_strobing`), `resync` / `-r` (re-send the handshake).
+
+Run `rogauracore presets` for the list of built-in preset ids. `preset` also accepts a partial id or name, so `sunset` matches `sunset_glow`.
 
 ## Colors and speeds
 
@@ -62,7 +64,7 @@ Aliases: `initialize_keyboard` (= `init`), `color_cycle` (= `single_colorcycle`)
 | Code | Meaning |
 | :--- | :--- |
 | `0` | Success |
-| `1` | Invalid arguments, no lighting interface found, write blocked by macOS, or write failed. The message goes to stderr. |
+| `1` | Invalid arguments, unknown command, no lighting interface found (including `--status` and `--json`), write blocked by macOS, or write failed. The message goes to stderr. |
 
 ## Using it alongside the app
 
@@ -81,7 +83,8 @@ rogauracore multi_breathing ff007f 8000ff 00ffff 007fff 3
 rogauracore brightness 1
 
 # Use in a script
-if rogauracore --json | grep -q '"connected" : true'; then
+# --json exits 0 only when a lighting interface is found
+if rogauracore --json >/dev/null 2>&1; then
   rogauracore preset classic_rog
 fi
 ```

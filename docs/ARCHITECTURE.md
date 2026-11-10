@@ -8,6 +8,7 @@ For contributors: how the code is organized, how it talks to the hardware, and w
 - [The Aura protocol](#the-aura-protocol)
 - [Hotkeys](#hotkeys)
 - [Design decisions](#design-decisions)
+- [Documentation map](#documentation-map)
 - [Development](#development)
 
 ## Layout
@@ -188,6 +189,10 @@ The ⌃⌥⌘ shortcuts take a separate path through `GlobalShortcuts`, so they 
 - **One settings value.** `AppSettings` is stored as a single JSON value (`AppSettings.v1`) and decodes missing keys with defaults, so new settings need no migration.
 - **System accent color.** The UI uses the user's accent color. ROG identity comes from the emblem and icon. Red appears only where it's an actual lighting color.
 - **Not sandboxed.** Raw feature reports to a vendor HID device aren't reliably permitted in the sandbox.
+
+## Documentation map
+
+To avoid drift, each fact has one home: product IDs and key codes live in the code (`HardwareKeys.swift`) and are described here; user-facing behavior lives in the [User Guide](USER_GUIDE.md); sensor requirements live in [Hackintosh Notes](HACKINTOSH.md#sensors). When you change one, update that doc and link to it from the others rather than copying.
 
 ## Development
 

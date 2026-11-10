@@ -2,6 +2,12 @@
 
 All notable changes to ROG Gaming Center. Downloads are on the [Releases](https://github.com/sritulasiram/rog-gaming-center-hackintosh/releases) page.
 
+## [Unreleased]
+
+### Changed
+
+- Documentation: added a contributing guide and issue templates, an events reference in Troubleshooting, upgrade notes for 1.x, and CLI corrections (`--status` fields, `--json` exit code, color shortcut brightness).
+
 ## [2.0.0] — 2026-10-25
 
 A ground-up rebuild as a native macOS app, with a safer keyboard driver and only real system readings. Requires macOS 14 Sonoma or later. Settings and saved presets from 1.x are migrated automatically.
@@ -52,5 +58,6 @@ First release.
 - Fn hotkeys and the ROG key, a menu bar companion, and restoring lighting after sleep.
 - The `rogauracore` command-line tool.
 
+[Unreleased]: https://github.com/sritulasiram/rog-gaming-center-hackintosh/compare/v2.0.0...HEAD
 [2.0.0]: https://github.com/sritulasiram/rog-gaming-center-hackintosh/releases/tag/v2.0.0
 [1.0.0]: https://github.com/sritulasiram/rog-gaming-center-hackintosh/releases/tag/v1.0.0

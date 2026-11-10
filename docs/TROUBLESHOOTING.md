@@ -27,6 +27,7 @@ flowchart TD
 Details for each step are in the sections below.
 
 - [Where to start](#where-to-start)
+- [Reading Status → Events](#reading-status--events)
 - [Lighting doesn't change](#lighting-doesnt-change)
 - ["Keyboard access needed" won't go away](#keyboard-access-needed-wont-go-away)
 - ["Keyboard not found"](#keyboard-not-found)
@@ -39,6 +40,19 @@ Details for each step are in the sections below.
 - [Shortcuts don't work](#shortcuts-dont-work)
 - [Open at login doesn't stick](#open-at-login-doesnt-stick)
 - [Reporting a bug](#reporting-a-bug)
+
+## Reading Status → Events
+
+| Event | Meaning | What to do |
+| :--- | :--- | :--- |
+| Started: "No Aura keyboard found" | No qualifying interface at launch | [Keyboard not found](#keyboard-not-found) |
+| Keyboard connected | The controller appeared or reappeared | Nothing; lighting is restored |
+| Keyboard disconnected | The controller disappeared, often after sleep | If it doesn't come back, fix the [USB map](HACKINTOSH.md#usb-mapping) |
+| Input Monitoring denied | macOS is blocking reads and writes | [Keyboard access needed](#keyboard-access-needed-wont-go-away) |
+| Input Monitoring granted | Permission was given | Nothing |
+| Keyboard write failed | The last write didn't succeed; the detail says why | Click **Re-sync Keyboard**; if it repeats, report it with the detail text |
+| Restored after wake | Lighting was resent after sleep | Nothing |
+| Fan / Touchpad key pressed | Key recognized, no action on macOS | Nothing |
 
 ## Lighting doesn't change
 
@@ -91,7 +105,7 @@ The app only shows what the SMC reports and never estimates. Fan speed is unavai
 
 ## Battery health missing
 
-- **Health, cycles, power** appear only when `AppleSmartBattery` reports capacities in mAh. That depends on your battery patches.
+**Health, cycles and power** appear only when `AppleSmartBattery` reports design and full-charge capacity in mAh. That depends on your battery patches. If charge percentage is also missing, the battery driver isn't working at all. See [Hackintosh Notes → Sensors](HACKINTOSH.md#sensors).
 
 ## Display colors look wrong
 
