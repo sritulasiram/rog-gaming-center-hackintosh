@@ -20,6 +20,7 @@ Sources/
 │   ├── AuraProtocol.swift     Colors, modes, presets, 17-byte packet builder
 │   ├── AuraEffects.swift      Effect families, mode editing, preview animation
 │   ├── LightingState.swift    Complete backlight state → packet transaction
+│   ├── LossyArray.swift       Array decoding that skips unreadable elements
 │   ├── HardwareKeys.swift     Hotkey decoding, debouncing, interface selection
 │   └── DisplayProfile.swift   Display profiles and their gamma curves
 ├── AuraHID/
@@ -145,6 +146,8 @@ A full transaction is: handshake → brightness → mode packet(s) → set → a
 3. Fall back to known product IDs on any page.
 4. Never mix product IDs.
 
+Interfaces are sorted before selection, so the choice is the same on every launch. When several collections of one controller qualify, each is tried in order and the write succeeds as soon as one accepts it. Hotkeys are only accepted from the product that owns the lighting interface.
+
 This prevents writing lighting packets to other ASUS devices.
 
 ## Hotkeys
@@ -186,7 +189,8 @@ The ⌃⌥⌘ shortcuts take a separate path through `GlobalShortcuts`, so they 
 - **Hardware-only hotkeys.** Fn and F-keys aren't intercepted with `NSEvent` monitors. On macOS, arrow and F-keys always carry the "function" modifier, so such monitors fire system-wide on ordinary key presses. Only vendor HID reports from the controller are used, plus explicit `RegisterEventHotKey` shortcuts.
 - **Gamma from ColorSync.** Each profile is computed from the display's current ColorSync table, obtained through `CGDisplayRestoreColorSyncSettings`. Gamma is only touched once a non-Standard profile has been used, so Night Shift and similar tools aren't disturbed.
 - **On-demand telemetry.** Sampling runs only while a view that shows it is open, and stops when the last one closes.
-- **One settings value.** `AppSettings` is stored as a single JSON value (`AppSettings.v1`) and decodes missing keys with defaults, so new settings need no migration.
+- **One settings value.** `AppSettings` is stored as a single JSON value (`AppSettings.v1`). Each field decodes on its own and falls back to its default when missing or unreadable, and unreadable presets are skipped, so new settings need no migration and one bad value never costs the rest. The JSON written by released versions is pinned in `PersistenceFormatTests`; a value that can't be read at all is kept under `AppSettings.v1.unreadable`.
+- **Permission comes from one place.** `HIDAccess` is only ever read from `IOHIDCheckAccess`, never inferred from a failed open or write. A device held exclusively by another app is reported as `.busy`, not as a permission problem.
 - **System accent color.** The UI uses the user's accent color. ROG identity comes from the emblem and icon. Red appears only where it's an actual lighting color.
 - **Not sandboxed.** Raw feature reports to a vendor HID device aren't reliably permitted in the sandbox.
 

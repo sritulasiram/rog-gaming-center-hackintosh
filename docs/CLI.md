@@ -64,7 +64,7 @@ Run `rogauracore presets` for the list of built-in preset ids. `preset` also acc
 | Code | Meaning |
 | :--- | :--- |
 | `0` | Success |
-| `1` | Invalid arguments, unknown command, no lighting interface found (including `--status` and `--json`), write blocked by macOS, or write failed. The message goes to stderr. |
+| `1` | Invalid arguments, unknown command, no lighting interface found (including `--status` and `--json`), write blocked by macOS, controller held exclusively by another app, or write failed. The message goes to stderr. |
 
 ## Using it alongside the app
 

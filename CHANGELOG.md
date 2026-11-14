@@ -4,6 +4,28 @@ All notable changes to ROG Gaming Center. Downloads are on the [Releases](https:
 
 ## [Unreleased]
 
+## [2.0.1] — 2026-11-15
+
+A reliability release: fixes in keyboard access, saved settings and sensor readings, plus a safer build script. Settings and presets from 2.0.0 carry over unchanged.
+
+### Added
+
+- The Dashboard shows fan speed in RPM for every fan the SMC reports.
+- Settings marks global shortcuts that another app has already taken.
+
+### Fixed
+
+- A keyboard controller held exclusively by another app (such as a key remapper) was reported as missing Input Monitoring, and the app then re-opened the keyboard every two seconds. It is now reported as busy.
+- An unreadable saved value could reset every setting and saved preset. Each setting now loads on its own and unreadable presets are skipped.
+- Hotkey reports from other ASUS devices could trigger the ROG key or sleep actions.
+- Lighting could fail or pick a different interface between launches on controllers that expose several vendor interfaces.
+- The first lighting update after granting Input Monitoring could fail.
+- Clicking a zone in the keyboard preview could select its neighbor in a wide window.
+- Memory in use now matches Activity Monitor (app memory, wired and compressed).
+- Temperature and fan readings are decoded by their SMC data type, so SMBIOS models that report floats work.
+- `build.sh` deleted `./build` in the current directory when run from elsewhere, and reset the Input Monitoring grant on every install even with a stable signing identity.
+- A second copy of the app can no longer be launched alongside the first.
+
 ### Changed
 
 - Documentation: added a contributing guide and issue templates, an events reference in Troubleshooting, upgrade notes for 1.x, and CLI corrections (`--status` fields, `--json` exit code, color shortcut brightness).
@@ -58,6 +80,7 @@ First release.
 - Fn hotkeys and the ROG key, a menu bar companion, and restoring lighting after sleep.
 - The `rogauracore` command-line tool.
 
-[Unreleased]: https://github.com/sritulasiram/rog-gaming-center-hackintosh/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/sritulasiram/rog-gaming-center-hackintosh/compare/v2.0.1...HEAD
+[2.0.1]: https://github.com/sritulasiram/rog-gaming-center-hackintosh/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/sritulasiram/rog-gaming-center-hackintosh/releases/tag/v2.0.0
 [1.0.0]: https://github.com/sritulasiram/rog-gaming-center-hackintosh/releases/tag/v1.0.0

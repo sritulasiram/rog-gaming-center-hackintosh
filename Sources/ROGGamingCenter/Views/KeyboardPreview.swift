@@ -26,7 +26,7 @@ struct KeyboardPreview: View {
             .contentShape(Rectangle())
             .onTapGesture { location in
                 guard let onSelectZone, geo.size.width > 0 else { return }
-                onSelectZone(min(3, max(0, Int(location.x / geo.size.width * 4))))
+                onSelectZone(KeyboardLayout.Metrics(size: geo.size).zone(atX: location.x))
             }
         }
         .accessibilityElement()
@@ -56,19 +56,37 @@ private enum KeyboardLayout {
     ]
     static let numpadRows: [[Double]] = Array(repeating: [1, 1, 1, 1], count: 6)
     static let totalUnits = 15 + 0.5 + 4.0
+    static let rowUnits = 5.6
+
+    /// Where the keyboard sits inside the view. Shared by drawing and hit-testing so a
+    /// tap always selects the zone drawn under it, even when the keyboard is letterboxed.
+    struct Metrics {
+        let unit: CGFloat
+        let width: CGFloat
+        let origin: CGPoint
+
+        init(size: CGSize) {
+            let area = CGRect(origin: .zero, size: size).insetBy(dx: 18, dy: 18)
+            unit = max(0, min(area.width / totalUnits, area.height / rowUnits))
+            width = unit * totalUnits
+            origin = CGPoint(x: area.midX - width / 2, y: area.midY - unit * rowUnits / 2)
+        }
+
+        func zone(atX x: CGFloat) -> Int {
+            guard width > 0 else { return 0 }
+            return min(3, max(0, Int((x - origin.x) / width * 4)))
+        }
+    }
 
     static func draw(in ctx: inout GraphicsContext, size: CGSize, colors: [AuraColor], intensity: Double, selectedZone: Int?) {
         let panel = CGRect(origin: .zero, size: size)
         ctx.fill(Path(roundedRect: panel, cornerRadius: 14), with: .color(Color(white: 0.07)))
 
-        let inset: CGFloat = 18
-        let area = panel.insetBy(dx: inset, dy: inset)
-        let unit = min(area.width / totalUnits, area.height / 5.6)
+        let metrics = Metrics(size: size)
+        let unit = metrics.unit, width = metrics.width, origin = metrics.origin
         let gap = unit * 0.12
-        let width = unit * totalUnits
-        let origin = CGPoint(x: area.midX - width / 2, y: area.midY - unit * 5.6 / 2)
 
-        func zone(atX x: CGFloat) -> Int { min(3, max(0, Int((x - origin.x) / width * 4))) }
+        func zone(atX x: CGFloat) -> Int { metrics.zone(atX: x) }
         func lit(_ index: Int) -> Color {
             intensity == 0 ? .clear : Color(colors[index]).opacity(intensity)
         }

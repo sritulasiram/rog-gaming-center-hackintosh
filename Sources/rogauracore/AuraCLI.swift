@@ -176,6 +176,7 @@ struct AuraCLI {
         case .success: print("✓ \(message)")
         case .noDevice: fail("No Aura lighting interface found. Run 'rogauracore --diagnose'.")
         case .accessDenied: fail("macOS blocked the write. Grant Input Monitoring to this terminal in System Settings.")
+        case .busy: fail("Another app is holding the keyboard controller exclusively (for example a key remapper). Quit it and try again.")
         case .failed(let code): fail(String(format: "Write failed (IOReturn 0x%08X).", code))
         case .superseded: break
         }

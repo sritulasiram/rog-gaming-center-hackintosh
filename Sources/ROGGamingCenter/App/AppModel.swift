@@ -45,6 +45,8 @@ final class AppModel {
     var isPermissionSheetPresented = false
     private(set) var device: AuraDeviceInfo?
     private(set) var hidAccess: HIDAccess
+    /// Global shortcuts macOS refused to register, usually because another app owns them.
+    private(set) var unavailableShortcuts: [GlobalShortcuts.Action] = []
 
     let lighting: LightingController
     let telemetry = TelemetryMonitor()
@@ -73,12 +75,14 @@ final class AppModel {
         display = DisplayController(profile: settings.displayProfile)
 
         wire()
-        if settings.globalShortcutsEnabled { shortcuts.register() }
+        if settings.globalShortcutsEnabled { registerShortcuts() }
         isPermissionSheetPresented = hidAccess != .granted
         updateAccessPolling()
 
         log.add(.info, "Started", device.map { "Found \($0.name) (\($0.formattedPID))." } ?? "No Aura keyboard found.")
-        lighting.resync()
+        // Without a keyboard or permission the write can only fail; the device and
+        // access callbacks resync as soon as both are available.
+        if device != nil, hidAccess == .granted { lighting.resync() }
     }
 
     // MARK: - Wiring
@@ -101,7 +105,7 @@ final class AppModel {
             device = info
             if let info {
                 log.add(.success, "Keyboard connected", "\(info.name) (\(info.formattedPID))")
-                lighting.resync()
+                if hidAccess == .granted { lighting.resync() }
             } else {
                 log.add(.warning, "Keyboard disconnected")
             }
@@ -113,7 +117,7 @@ final class AppModel {
             if access == .granted {
                 isPermissionSheetPresented = false
                 log.add(.success, "Input Monitoring granted")
-                lighting.resync()
+                if device != nil { lighting.resync() }
             } else if access == .denied {
                 log.add(.warning, "Input Monitoring denied", "Keyboard lighting and hotkeys are blocked by macOS.")
             }
@@ -151,9 +155,23 @@ final class AppModel {
         }
     }
 
+    private func registerShortcuts() {
+        shortcuts.register()
+        unavailableShortcuts = shortcuts.failed
+        if !unavailableShortcuts.isEmpty {
+            let names = unavailableShortcuts.map { GlobalShortcuts.Action.modifierGlyphs + $0.keyGlyph }.joined(separator: ", ")
+            log.add(.warning, "Shortcuts unavailable", "\(names) could not be registered; another app is probably using them.")
+        }
+    }
+
     private func settingsChanged(from old: AppSettings) {
         if settings.globalShortcutsEnabled != old.globalShortcutsEnabled {
-            settings.globalShortcutsEnabled ? shortcuts.register() : shortcuts.unregister()
+            if settings.globalShortcutsEnabled {
+                registerShortcuts()
+            } else {
+                shortcuts.unregister()
+                unavailableShortcuts = []
+            }
         }
         if settings.showDockIcon != old.showDockIcon {
             applyActivationPolicy()
@@ -271,6 +289,7 @@ final class AppModel {
         case .success: return "OK"
         case .noDevice: return "No Aura keyboard is connected."
         case .accessDenied: return "macOS blocked the write. Allow Input Monitoring for ROG Gaming Center."
+        case .busy: return "Another app is holding the keyboard controller exclusively. Quit key remappers and re-sync."
         case .failed(let code): return String(format: "IOKit error 0x%08X", code)
         case .superseded: return "Replaced by a newer change."
         }

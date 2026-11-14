@@ -46,7 +46,7 @@ struct StatusView: View {
             Section("Sensors") {
                 LabeledContent("SMC", value: SMCReader.shared.isAvailable ? "Available" : "Unavailable")
                 LabeledContent("CPU temperature", value: model.telemetry.thermal.cpuCelsius == nil ? "Not reported" : "Reported")
-                LabeledContent("Fan speed", value: model.telemetry.thermal.fanRPM == nil ? "Not reported" : "Reported")
+                LabeledContent("Fan speed", value: model.telemetry.thermal.fanRPMs.isEmpty ? "Not reported" : "Reported")
             }
 
             Section("Events") {

@@ -51,6 +51,8 @@ Details for each step are in the sections below.
 | Input Monitoring denied | macOS is blocking reads and writes | [Keyboard access needed](#keyboard-access-needed-wont-go-away) |
 | Input Monitoring granted | Permission was given | Nothing |
 | Keyboard write failed | The last write didn't succeed; the detail says why | Click **Re-sync Keyboard**; if it repeats, report it with the detail text |
+| Keyboard write failed: "Another app is holding the keyboard controller exclusively" | A key remapper or similar tool has seized the device | Quit that app or exclude the ASUS keyboard in it, then click **Re-sync Keyboard** |
+| Shortcuts unavailable | Another app already uses one of the ⌃⌥⌘ shortcuts | Change the shortcut in the other app, or turn shortcuts off in **Settings → Keyboard** |
 | Restored after wake | Lighting was resent after sleep | Nothing |
 | Fan / Touchpad key pressed | Key recognized, no action on macOS | Nothing |
 

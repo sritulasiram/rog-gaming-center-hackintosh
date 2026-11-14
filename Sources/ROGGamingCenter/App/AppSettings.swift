@@ -30,19 +30,24 @@ struct AppSettings: Codable, Equatable {
 
     init() {}
 
-    // Tolerates missing keys so new settings can be added without a migration.
+    // Every field decodes on its own: a missing or unreadable value falls back to its
+    // default instead of failing the whole load, so new settings need no migration and
+    // one bad value (say, a preset saved by a newer version) never costs the rest.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let d = AppSettings()
-        lighting = try c.decodeIfPresent(LightingState.self, forKey: .lighting) ?? d.lighting
-        customPresets = try c.decodeIfPresent([AuraPreset].self, forKey: .customPresets) ?? d.customPresets
-        displayProfile = try c.decodeIfPresent(DisplayProfile.self, forKey: .displayProfile) ?? d.displayProfile
-        keepRunningInMenuBar = try c.decodeIfPresent(Bool.self, forKey: .keepRunningInMenuBar) ?? d.keepRunningInMenuBar
-        showDockIcon = try c.decodeIfPresent(Bool.self, forKey: .showDockIcon) ?? d.showDockIcon
-        rogKeyEnabled = try c.decodeIfPresent(Bool.self, forKey: .rogKeyEnabled) ?? d.rogKeyEnabled
-        rogKeyAction = (try? c.decodeIfPresent(ROGKeyAction.self, forKey: .rogKeyAction)) ?? d.rogKeyAction
-        globalShortcutsEnabled = try c.decodeIfPresent(Bool.self, forKey: .globalShortcutsEnabled) ?? d.globalShortcutsEnabled
-        showBrightnessHUD = try c.decodeIfPresent(Bool.self, forKey: .showBrightnessHUD) ?? d.showBrightnessHUD
+        func value<T: Decodable>(_ key: CodingKeys, _ fallback: T) -> T {
+            (try? c.decodeIfPresent(T.self, forKey: key)) ?? fallback
+        }
+        lighting = value(.lighting, d.lighting)
+        customPresets = (try? c.decodeIfPresent(LossyArray<AuraPreset>.self, forKey: .customPresets))?.elements ?? d.customPresets
+        displayProfile = value(.displayProfile, d.displayProfile)
+        keepRunningInMenuBar = value(.keepRunningInMenuBar, d.keepRunningInMenuBar)
+        showDockIcon = value(.showDockIcon, d.showDockIcon)
+        rogKeyEnabled = value(.rogKeyEnabled, d.rogKeyEnabled)
+        rogKeyAction = value(.rogKeyAction, d.rogKeyAction)
+        globalShortcutsEnabled = value(.globalShortcutsEnabled, d.globalShortcutsEnabled)
+        showBrightnessHUD = value(.showBrightnessHUD, d.showBrightnessHUD)
     }
 }
 
@@ -51,6 +56,8 @@ struct AppSettings: Codable, Equatable {
 @MainActor
 final class SettingsStore {
     private static let key = "AppSettings.v1"
+    /// Holds the previous value when it couldn't be read, so it is never silently destroyed.
+    private static let backupKey = "AppSettings.v1.unreadable"
     private let defaults: UserDefaults
     private var pendingSave: DispatchWorkItem?
 
@@ -59,9 +66,11 @@ final class SettingsStore {
     }
 
     func load() -> AppSettings {
-        if let data = defaults.data(forKey: Self.key),
-           let settings = try? JSONDecoder().decode(AppSettings.self, from: data) {
-            return settings
+        if let data = defaults.data(forKey: Self.key) {
+            if let settings = try? JSONDecoder().decode(AppSettings.self, from: data) {
+                return settings
+            }
+            defaults.set(data, forKey: Self.backupKey)
         }
         let migrated = migrateLegacy()
         saveNow(migrated)

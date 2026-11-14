@@ -45,8 +45,8 @@ struct BatteryStatus: Equatable {
 /// Values are nil when the SMC does not expose that sensor.
 struct ThermalStatus: Equatable {
     var cpuCelsius: Int?
-    var fanRPM: Int?
-    var fanMaxRPM: Int?
+    /// One entry per fan the SMC reports a speed for; empty when it reports none.
+    var fanRPMs: [Int] = []
 }
 
 struct SystemInfo: Equatable {
@@ -151,6 +151,10 @@ final class SystemSampler: @unchecked Sendable {
     }
 
     private var previousTicks: host_cpu_load_info?
+    /// `mach_host_self()` hands out a new port right on every call, so take it once.
+    private let host = mach_host_self()
+    /// The fan count never changes at runtime; nil until the SMC has answered once.
+    private var fanCount: Int?
 
     func snapshot() -> Snapshot {
         Snapshot(cpu: cpuLoad(), memory: memory(), battery: battery(), thermal: thermal(), uptime: uptime())
@@ -204,7 +208,7 @@ final class SystemSampler: @unchecked Sendable {
         var count = mach_msg_type_number_t(MemoryLayout<host_cpu_load_info_data_t>.size / MemoryLayout<integer_t>.size)
         let result = withUnsafeMutablePointer(to: &info) {
             $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
-                host_statistics(mach_host_self(), HOST_CPU_LOAD_INFO, $0, &count)
+                host_statistics(host, HOST_CPU_LOAD_INFO, $0, &count)
             }
         }
         guard result == KERN_SUCCESS else { return nil }
@@ -226,20 +230,22 @@ final class SystemSampler: @unchecked Sendable {
         var count = mach_msg_type_number_t(MemoryLayout<vm_statistics64_data_t>.size / MemoryLayout<integer_t>.size)
         let result = withUnsafeMutablePointer(to: &stats) {
             $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
-                host_statistics64(mach_host_self(), HOST_VM_INFO64, $0, &count)
+                host_statistics64(host, HOST_VM_INFO64, $0, &count)
             }
         }
         guard result == KERN_SUCCESS else { return nil }
 
         var pageSize: vm_size_t = 0
-        host_page_size(mach_host_self(), &pageSize)
+        host_page_size(host, &pageSize)
         let gb = Double(pageSize) / 1_073_741_824
-        let active = Double(stats.active_count) * gb
+        // Same breakdown as Activity Monitor's "Memory Used": app memory (anonymous
+        // pages that can't simply be dropped) + wired + compressed.
+        let app = Double(stats.internal_page_count &- stats.purgeable_count) * gb
         let wired = Double(stats.wire_count) * gb
         let compressed = Double(stats.compressor_page_count) * gb
         return MemoryUsage(
             totalGB: Double(ProcessInfo.processInfo.physicalMemory) / 1_073_741_824,
-            usedGB: active + wired + compressed,
+            usedGB: app + wired + compressed,
             compressedGB: compressed
         )
     }
@@ -297,10 +303,12 @@ final class SystemSampler: @unchecked Sendable {
 
     private func thermal() -> ThermalStatus {
         let smc = SMCReader.shared
+        if fanCount == nil, smc.isAvailable { fanCount = smc.readFanCount() }
+        // Some kexts publish F0Ac without FNum, so always probe at least the first fan.
+        let fans = (0..<max(1, fanCount ?? 0)).compactMap { smc.readFanRPM(index: $0).map { Int($0.rounded()) } }
         return ThermalStatus(
             cpuCelsius: smc.readCPUTemperature().map { Int($0.rounded()) },
-            fanRPM: smc.readFanRPM(index: 0).flatMap { $0 > 0 ? Int($0) : nil },
-            fanMaxRPM: smc.readMaxFanRPM(index: 0).map { Int($0) }
+            fanRPMs: fans
         )
     }
 }

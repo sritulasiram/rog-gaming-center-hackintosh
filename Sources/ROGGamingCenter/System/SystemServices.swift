@@ -116,12 +116,15 @@ final class GlobalShortcuts {
 
     var onAction: ((Action) -> Void)?
     private var hotKeys: [EventHotKeyRef] = []
+    /// Actions whose key combination could not be registered on the last `register()`.
+    private(set) var failed: [Action] = []
     private var handler: EventHandlerRef?
 
     var isRegistered: Bool { !hotKeys.isEmpty }
 
     func register() {
         guard hotKeys.isEmpty else { return }
+        failed = []
         if handler == nil {
             var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
             InstallEventHandler(GetApplicationEventTarget(), { _, event, context in
@@ -140,6 +143,8 @@ final class GlobalShortcuts {
             if RegisterEventHotKey(UInt32(action.keyCode), Action.modifiers, id, GetApplicationEventTarget(), 0, &ref) == noErr,
                let ref {
                 hotKeys.append(ref)
+            } else {
+                failed.append(action)
             }
         }
     }
@@ -147,6 +152,7 @@ final class GlobalShortcuts {
     func unregister() {
         hotKeys.forEach { UnregisterEventHotKey($0) }
         hotKeys.removeAll()
+        failed = []
     }
 }
 

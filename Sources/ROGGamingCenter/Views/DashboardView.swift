@@ -94,6 +94,7 @@ private struct ThermalCard: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
+        let fans = model.telemetry.thermal.fanRPMs
         Card(title: "Thermals", symbol: "thermometer.medium") {
             if let temp = model.telemetry.thermal.cpuCelsius {
                 let level = Self.level(for: temp)
@@ -113,6 +114,10 @@ private struct ThermalCard: View {
             } else {
                 BigValue(value: "—", caption: "CPU temperature")
                 Text("Not available on this Mac.").font(.callout).foregroundStyle(.secondary)
+            }
+            // Only shown when the SMC actually publishes fan speeds.
+            ForEach(Array(fans.enumerated()), id: \.offset) { index, rpm in
+                StatRow(fans.count > 1 ? "Fan \(index + 1)" : "Fan", rpm > 0 ? "\(rpm) RPM" : "Stopped")
             }
         }
     }

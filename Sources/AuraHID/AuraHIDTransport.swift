@@ -35,6 +35,8 @@ public enum AuraWriteResult: Equatable, Sendable {
     case success
     case noDevice
     case accessDenied
+    /// Another process holds the device exclusively (e.g. a key remapper that seized it).
+    case busy
     case failed(Int32)
     /// A newer state was queued before this one was written; it was skipped on purpose.
     case superseded
@@ -88,18 +90,18 @@ public final class AuraHIDTransport {
         }, context)
 
         if listenForKeys {
-            IOHIDManagerRegisterInputValueCallback(manager, { ctx, _, _, value in
+            IOHIDManagerRegisterInputValueCallback(manager, { ctx, _, sender, value in
                 guard let ctx, IOHIDValueGetIntegerValue(value) == 1 else { return }
                 let element = IOHIDValueGetElement(value)
                 guard let key = HardwareKey.decode(usagePage: IOHIDElementGetUsagePage(element),
                                                    usage: IOHIDElementGetUsage(element)) else { return }
-                Unmanaged<AuraHIDTransport>.fromOpaque(ctx).takeUnretainedValue().deliver(key)
+                Unmanaged<AuraHIDTransport>.fromOpaque(ctx).takeUnretainedValue().deliver(key, from: sender)
             }, context)
-            IOHIDManagerRegisterInputReportCallback(manager, { ctx, _, _, _, reportID, report, length in
+            IOHIDManagerRegisterInputReportCallback(manager, { ctx, _, sender, _, reportID, report, length in
                 guard let ctx, length >= 2 else { return }
                 let bytes = Array(UnsafeBufferPointer(start: report, count: min(length, 4)))
                 guard let key = HardwareKey.decode(reportID: reportID, report: bytes) else { return }
-                Unmanaged<AuraHIDTransport>.fromOpaque(ctx).takeUnretainedValue().deliver(key)
+                Unmanaged<AuraHIDTransport>.fromOpaque(ctx).takeUnretainedValue().deliver(key, from: sender)
             }, context)
         }
 
@@ -128,7 +130,6 @@ public final class AuraHIDTransport {
     public func requestAccess() -> Bool {
         let granted = IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
         updateAccess()
-        if granted { reopen() }
         return granted
     }
 
@@ -138,8 +139,9 @@ public final class AuraHIDTransport {
         let current = Self.checkAccess()
         guard current != access else { return }
         access = current
-        onAccessChange?(current)
+        // Reopen before notifying: observers react by writing to the device.
         if current == .granted { reopen() }
+        onAccessChange?(current)
     }
 
     public func reopen() {
@@ -148,19 +150,24 @@ public final class AuraHIDTransport {
     }
 
     private func open() {
-        let result = IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone))
-        if result == kIOReturnNotPermitted, access != .denied {
-            access = .denied
-            onAccessChange?(.denied)
-        }
+        // The result is deliberately not used to infer permission: `IOHIDCheckAccess`
+        // is the only source of truth for `access`, so the two can never disagree and flap.
+        _ = IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone))
         refreshDevices()
     }
 
     // MARK: - Devices
 
     public func refreshDevices() {
-        let devices = (IOHIDManagerCopyDevices(manager) as? Set<IOHIDDevice>).map(Array.init) ?? []
-        let infos = devices.map(Self.info(for:))
+        // Sorted so the chosen interface and write order are the same on every launch.
+        let pairs = ((IOHIDManagerCopyDevices(manager) as? Set<IOHIDDevice>).map(Array.init) ?? [])
+            .map { (device: $0, info: Self.info(for: $0)) }
+            .sorted {
+                ($0.info.productID, $0.info.usagePage, $0.info.usage, $1.info.maxFeatureReportSize)
+                    < ($1.info.productID, $1.info.usagePage, $1.info.usage, $0.info.maxFeatureReportSize)
+            }
+        let devices = pairs.map(\.device)
+        let infos = pairs.map(\.info)
         let selected = AuraInterfaceSelector.select(infos.map(\.descriptor))
 
         lock.lock()
@@ -191,7 +198,14 @@ public final class AuraHIDTransport {
 
     // MARK: - Keys
 
-    private func deliver(_ key: HardwareKey) {
+    /// Keys are only accepted from the keyboard that owns the lighting interface, so
+    /// another ASUS peripheral can never trigger sleep or the ROG action.
+    private func deliver(_ key: HardwareKey, from sender: UnsafeMutableRawPointer?) {
+        if let lighting = device, let sender {
+            let source = Unmanaged<IOHIDDevice>.fromOpaque(sender).takeUnretainedValue()
+            let productID = IOHIDDeviceGetProperty(source, kIOHIDProductIDKey as CFString) as? Int
+            guard productID == lighting.productID else { return }
+        }
         guard debouncer.accept(key, at: ProcessInfo.processInfo.systemUptime) else { return }
         onKey?(key)
     }
@@ -230,10 +244,8 @@ public final class AuraHIDTransport {
 
             let result = write(job.packets)
             DispatchQueue.main.async { [weak self] in
-                if result == .accessDenied, let self, self.access != .denied {
-                    self.access = .denied
-                    self.onAccessChange?(.denied)
-                }
+                // Re-read the real permission state rather than inferring it from the failure.
+                if result == .accessDenied { self?.updateAccess() }
                 job.completion?(result)
             }
         }
@@ -245,22 +257,32 @@ public final class AuraHIDTransport {
         lock.unlock()
         guard !devices.isEmpty else { return .noDevice }
 
+        // A controller can expose several qualifying collections and only one may take
+        // the lighting reports, so the write succeeds if any of them accepts it.
         return HIDWriteLock.withLock {
+            var firstFailure: AuraWriteResult?
             for device in devices {
-                for packet in packets {
-                    var buffer = packet
-                    let status = IOHIDDeviceSetReport(device, kIOHIDReportTypeFeature, CFIndex(buffer[0]), &buffer, buffer.count)
-                    if status == kIOReturnNotPermitted || status == kIOReturnExclusiveAccess {
-                        return .accessDenied
-                    }
-                    if status != kIOReturnSuccess {
-                        return .failed(status)
-                    }
-                    usleep(Self.interPacketDelay)
-                }
+                let result = Self.write(packets, to: device)
+                if result == .success { return .success }
+                if firstFailure == nil { firstFailure = result }
             }
-            return .success
+            return firstFailure ?? .noDevice
         }
+    }
+
+    private static func write(_ packets: [[UInt8]], to device: IOHIDDevice) -> AuraWriteResult {
+        for packet in packets {
+            var buffer = packet
+            let status = IOHIDDeviceSetReport(device, kIOHIDReportTypeFeature, CFIndex(buffer[0]), &buffer, buffer.count)
+            switch status {
+            case kIOReturnSuccess: break
+            case kIOReturnNotPermitted: return .accessDenied
+            case kIOReturnExclusiveAccess: return .busy
+            default: return .failed(status)
+            }
+            usleep(interPacketDelay)
+        }
+        return .success
     }
 }
 

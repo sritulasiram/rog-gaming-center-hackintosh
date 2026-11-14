@@ -44,11 +44,11 @@ The dashboard only shows readings macOS actually provides. Nothing is estimated.
 | Battery charge and charging state | macOS power management | Needs a working battery setup (for example ECEnabler plus battery patches) |
 | Battery health, cycles, power | `AppleSmartBattery` | Present when the battery driver reports design and full-charge capacity in mAh |
 | **CPU temperature** | SMC keys `TC0P`, `TC0D`, `TC0E`, `TC0F`, `TC1C`–`TC4C`, `TCXC` | VirtualSMC with **SMCProcessor** (Intel) or **SMCAMDProcessor** (AMD) |
-| **Fan speed** | SMC keys `F0Ac` / `F0Mx` | A kext that publishes fan keys to VirtualSMC, such as **SMCSuperIO** where the chip is supported |
+| **Fan speed** | SMC keys `FNum` and `F0Ac`, `F1Ac`, … | A kext that publishes fan keys to VirtualSMC, such as **SMCSuperIO** where the chip is supported |
 
 ### About fan speed
 
-On many ASUS laptops the fans are driven by the embedded controller (EC), and no macOS kext reads them. SMCSuperIO targets desktop Super I/O chips and usually doesn't support laptop ECs. If nothing publishes the `F0Ac` key, macOS has no fan reading. The app then shows only the CPU temperature, and **Status → Sensors** lists fan speed as "Not reported" (and shows "Reported" when a value is available). The fans themselves still work normally under the EC's control.
+On many ASUS laptops the fans are driven by the embedded controller (EC), and no macOS kext reads them. SMCSuperIO targets desktop Super I/O chips and usually doesn't support laptop ECs. If nothing publishes the `F0Ac` key, macOS has no fan reading. The app then shows only the CPU temperature, and **Status → Sensors** lists fan speed as "Not reported". When a value is available, the Dashboard's Thermals card shows each fan's speed in RPM. The fans themselves still work normally under the EC's control.
 
 The app never controls fans, and macOS offers no way to do it on this hardware. The Fn+F5 fan key is recognized but intentionally does nothing.
 

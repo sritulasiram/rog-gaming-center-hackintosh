@@ -12,7 +12,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/macOS-14%2B-blue" alt="macOS 14+"/>
   <img src="https://img.shields.io/badge/Swift-5.9%2B-orange" alt="Swift 5.9+"/>
-  <a href="https://github.com/sritulasiram/rog-gaming-center-hackintosh/releases/latest"><img src="https://img.shields.io/badge/version-2.0.0-brightgreen" alt="Version 2.0.0"/></a>
+  <a href="https://github.com/sritulasiram/rog-gaming-center-hackintosh/releases/latest"><img src="https://img.shields.io/badge/version-2.0.1-brightgreen" alt="Version 2.0.1"/></a>
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License"/>
 </p>
 
@@ -70,7 +70,7 @@ Full steps, signing and uninstalling: **[Installation](docs/INSTALLATION.md)**.
 
 ## Project Status
 
-Stable (2.0.0). Developed and verified on an **ASUS ROG Strix GL503GE** (ITE 8910, `PID 0x1869`). Other ITE-based ROG and TUF models should work. If you try one, please [open an issue](https://github.com/sritulasiram/rog-gaming-center-hackintosh/issues) with your model and the output of `rogauracore --diagnose`.
+Stable (2.0.1). Developed and verified on an **ASUS ROG Strix GL503GE** (ITE 8910, `PID 0x1869`). Other ITE-based ROG and TUF models should work. If you try one, please [open an issue](https://github.com/sritulasiram/rog-gaming-center-hackintosh/issues) with your model and the output of `rogauracore --diagnose`.
 
 ## Acknowledgements
 

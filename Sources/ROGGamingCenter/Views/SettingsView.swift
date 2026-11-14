@@ -75,9 +75,16 @@ private struct KeyboardSettings: View {
                 Toggle("Enable keyboard shortcuts", isOn: $model.settings.globalShortcutsEnabled)
                 ForEach(GlobalShortcuts.Action.allCases, id: \.self) { action in
                     LabeledContent(action.title) {
-                        Text(GlobalShortcuts.Action.modifierGlyphs + action.keyGlyph)
-                            .font(.body.monospaced())
-                            .foregroundStyle(.secondary)
+                        HStack(spacing: 8) {
+                            if model.unavailableShortcuts.contains(action) {
+                                Label("In use by another app", systemImage: "exclamationmark.triangle.fill")
+                                    .font(.callout)
+                                    .foregroundStyle(.orange)
+                            }
+                            Text(GlobalShortcuts.Action.modifierGlyphs + action.keyGlyph)
+                                .font(.body.monospaced())
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
                 .disabled(!model.settings.globalShortcutsEnabled)

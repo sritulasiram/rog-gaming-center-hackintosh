@@ -1,7 +1,12 @@
 #!/bin/bash
-set -e
+set -euo pipefail
+
+# Always work from the repository root: BUILD_DIR is relative and gets deleted below.
+cd "$(dirname "$0")"
 
 APP_NAME="ROG Gaming Center"
+# Single source for the app version (make-dmg.sh reads it back from Info.plist).
+VERSION="2.0.1"
 BUILD_DIR="./build"
 APP_BUNDLE="$BUILD_DIR/$APP_NAME.app"
 CONTENTS="$APP_BUNDLE/Contents"
@@ -24,7 +29,7 @@ cp "$BIN_DIR/ROGGamingCenter" "$MACOS/ROGGamingCenter"
 cp "$BIN_DIR/rogauracore" "$BUILD_DIR/rogauracore"
 chmod +x "$BUILD_DIR/rogauracore"
 
-# 3. Copy Resources into App Bundle
+# 2. Copy Resources into App Bundle
 echo "-> Packaging bundle assets..."
 if [ -f "./Resources/emblem.png" ]; then
     cp ./Resources/emblem.png "$RESOURCES/emblem.png"
@@ -49,7 +54,7 @@ if [ -f "$BUILD_DIR/rogauracore" ]; then
     chmod +x "$RESOURCES/rogauracore"
 fi
 
-# 4. Generate Info.plist
+# 3. Generate Info.plist
 cat << EOF > "$CONTENTS/Info.plist"
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -62,9 +67,9 @@ cat << EOF > "$CONTENTS/Info.plist"
     <key>CFBundleIdentifier</key>
     <string>com.asus.roggamingcenter</string>
     <key>CFBundleVersion</key>
-    <string>2.0.0</string>
+    <string>$VERSION</string>
     <key>CFBundleShortVersionString</key>
-    <string>2.0.0</string>
+    <string>$VERSION</string>
     <key>CFBundleExecutable</key>
     <string>ROGGamingCenter</string>
     <key>CFBundlePackageType</key>
@@ -73,6 +78,8 @@ cat << EOF > "$CONTENTS/Info.plist"
     <string>AppIcon</string>
     <key>LSUIElement</key>
     <false/>
+    <key>LSMultipleInstancesProhibited</key>
+    <true/>
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>LSMinimumSystemVersion</key>
@@ -83,7 +90,7 @@ cat << EOF > "$CONTENTS/Info.plist"
 </plist>
 EOF
 
-# 5. Code-sign with a STABLE identity
+# 4. Code-sign with a STABLE identity
 #
 # WHY THIS STEP EXISTS (read this if RGB works in Terminal but not in the app):
 # swiftc alone produces an UNSIGNED binary. macOS gates HID access (Input
@@ -97,8 +104,11 @@ EOF
 # Set SIGNING_IDENTITY below to a certificate from `security find-identity -v
 # -p codesigning` (a free self-signed "Apple Development" cert or a local
 # Keychain cert both work) for a grant that survives rebuilds. Falls back to
+# an auto-detected "Apple Development" identity, then to ad-hoc signing ("-"),
+# where the grant has to be given again after every build.
+SIGNING_IDENTITY="${SIGNING_IDENTITY:-}"
 if [ -z "$SIGNING_IDENTITY" ]; then
-    DETECTED_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | grep "Apple Development" | head -1 | awk -F '"' '{print $2}')
+    DETECTED_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | grep "Apple Development" | head -1 | awk -F '"' '{print $2}' || true)
     if [ -n "$DETECTED_IDENTITY" ]; then
         SIGNING_IDENTITY="$DETECTED_IDENTITY"
         echo "-> Auto-detected code-signing identity: $SIGNING_IDENTITY"
@@ -130,7 +140,7 @@ echo "✓ Successfully built:"
 echo "   - App Bundle: $APP_BUNDLE"
 echo "   - CLI Tool:   $BUILD_DIR/rogauracore"
 
-if [ "$1" == "--install" ]; then
+if [ "${1:-}" == "--install" ]; then
     echo "=============================================="
     echo "  Installing to System...                     "
     echo "=============================================="
@@ -138,10 +148,13 @@ if [ "$1" == "--install" ]; then
     # Terminate running instances if any
     killall ROGGamingCenter 2>/dev/null || true
     
-    # Every reinstall of an unsigned/ad-hoc-signed build looks like a "new app"
-    # to TCC. Clear any stale Input Monitoring record so macOS prompts fresh
-    # instead of silently denying against a record for a previous binary hash.
-    tccutil reset ListenEvent com.asus.roggamingcenter 2>/dev/null || true
+    # Every reinstall of an ad-hoc-signed build looks like a "new app" to TCC.
+    # Clear the stale Input Monitoring record so macOS prompts fresh instead of
+    # silently denying against a record for a previous binary hash. With a real
+    # signing identity the existing grant stays valid, so it is left alone.
+    if [ "$SIGNING_IDENTITY" == "-" ]; then
+        tccutil reset ListenEvent com.asus.roggamingcenter 2>/dev/null || true
+    fi
 
     echo "-> Installing application to /Applications/$APP_NAME.app..."
     rm -rf "/Applications/$APP_NAME.app"

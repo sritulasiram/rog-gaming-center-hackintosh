@@ -23,7 +23,7 @@ Closing the window keeps the app running in the menu bar, unless you turn that o
 | :--- | :--- |
 | **Processor** | Total CPU load, user and system split, CPU model and a two-minute history |
 | **Memory** | Memory in use, available and compressed |
-| **Thermals** | CPU temperature with a status: Cool below 60 °C, Warm below 75 °C, Hot below 88 °C, Very hot above that |
+| **Thermals** | CPU temperature with a status: Cool below 60 °C, Warm below 75 °C, Hot below 88 °C, Very hot above that. Fan speed in RPM when the SMC reports it. |
 | **Battery** | Charge, charging state and time remaining. On supported batteries also health, cycle count and power draw. |
 | **Keyboard** | Connection status, backlight on/off, brightness and preset, plus a link to Lighting |
 | **System** | macOS name, version and build, SMBIOS model, cores, memory and uptime |
